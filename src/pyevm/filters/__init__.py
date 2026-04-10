@@ -1,5 +1,5 @@
 """Temporal filters for video magnification."""
 
-from evm.filters.temporal import IdealBandpass, ButterworthBandpass
+from pyevm.filters.temporal import IdealBandpass, ButterworthBandpass
 
 __all__ = ["IdealBandpass", "ButterworthBandpass"]

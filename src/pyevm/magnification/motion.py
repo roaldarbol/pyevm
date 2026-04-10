@@ -20,9 +20,9 @@ import math
 import torch
 from loguru import logger
 
-from evm.filters.temporal import ButterworthBandpass, IdealBandpass
-from evm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
-from evm.pyramids.laplacian import LaplacianPyramid
+from pyevm.filters.temporal import ButterworthBandpass, IdealBandpass
+from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
+from pyevm.pyramids.laplacian import LaplacianPyramid
 
 
 class MotionMagnifier:

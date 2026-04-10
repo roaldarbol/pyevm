@@ -10,9 +10,9 @@ The tests validate:
 
 import torch
 import pytest
-from evm.magnification.color import ColorMagnifier
-from evm.magnification.motion import MotionMagnifier
-from evm.magnification.phase import PhaseMagnifier
+from pyevm.magnification.color import ColorMagnifier
+from pyevm.magnification.motion import MotionMagnifier
+from pyevm.magnification.phase import PhaseMagnifier
 
 FPS = 30.0
 

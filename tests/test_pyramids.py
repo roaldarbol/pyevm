@@ -2,9 +2,9 @@
 
 import torch
 import pytest
-from evm.pyramids.gaussian import GaussianPyramid
-from evm.pyramids.laplacian import LaplacianPyramid
-from evm.pyramids.steerable import SteerablePyramid
+from pyevm.pyramids.gaussian import GaussianPyramid
+from pyevm.pyramids.laplacian import LaplacianPyramid
+from pyevm.pyramids.steerable import SteerablePyramid
 
 
 # ---------------------------------------------------------------------------
@@ -130,9 +130,10 @@ class TestSteerablePyramid:
         pyramid = pyr.build(luma_frame)
         reconstructed = pyr.collapse(pyramid)
         assert reconstructed.shape == luma_frame.shape
-        # Allow some reconstruction error — the analytic pyramid is approximate
+        # The tight-frame design gives near-perfect reconstruction.
+        # Allow a small margin for floating-point and DFT up/downsample approximation.
         max_err = (reconstructed - luma_frame).abs().max().item()
-        assert max_err < 0.5, f"Reconstruction error too large: {max_err:.4f}"
+        assert max_err < 0.1, f"Reconstruction error too large: {max_err:.4f}"
 
     def test_highpass_shape(self, luma_frame):
         pyr = SteerablePyramid(n_scales=2, n_orientations=4)

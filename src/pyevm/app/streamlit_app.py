@@ -14,11 +14,11 @@ import streamlit as st
 import torch
 from loguru import logger
 
-from evm.device import get_device
-from evm.io.video import VideoReader, VideoWriter
-from evm.magnification.color import ColorMagnifier
-from evm.magnification.motion import MotionMagnifier
-from evm.magnification.phase import PhaseMagnifier
+from pyevm.device import get_device
+from pyevm.io.video import VideoReader, VideoWriter
+from pyevm.magnification.color import ColorMagnifier
+from pyevm.magnification.motion import MotionMagnifier
+from pyevm.magnification.phase import PhaseMagnifier
 
 # ---------------------------------------------------------------------------
 # Page config

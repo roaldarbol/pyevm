@@ -2,7 +2,7 @@
 
 import torch
 import pytest
-from evm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
+from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
 
 
 @pytest.fixture

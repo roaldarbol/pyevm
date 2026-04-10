@@ -117,14 +117,20 @@ class ButterworthBandpass:
         """
         original_shape = signal.shape
         T = signal.shape[0]
-        flat = signal.float().cpu().numpy().reshape(T, -1)  # (T, N)
+        # Use DLPack to convert tensor → numpy without the torch numpy bridge,
+        # which is broken on some platforms (e.g. Intel macOS + torch 2.2).
+        # Use DLPack in both directions to bypass torch's broken numpy bridge
+        # (torch.from_numpy / tensor.numpy() unavailable on some builds).
+        flat = np.from_dlpack(
+            signal.detach().float().cpu().contiguous()
+        ).reshape(T, -1)  # (T, N)
 
         # sosfilt expects (N, T) → transpose
-        flat_t = flat.T  # (N, T)
+        flat_t = np.ascontiguousarray(flat.T)  # (N, T)
         filtered_t = sosfilt(self._sos, flat_t, axis=-1)
-        filtered = filtered_t.T  # (T, N)
-
-        result = torch.from_numpy(filtered.reshape(original_shape)).to(
+        # numpy → torch via DLPack (numpy array must be contiguous float32)
+        filtered_c = np.ascontiguousarray(filtered_t.T, dtype=np.float32)  # (T, N)
+        result = torch.from_dlpack(filtered_c).reshape(original_shape).to(
             device=signal.device, dtype=signal.dtype
         )
         logger.debug(f"ButterworthBandpass: filtered {tuple(signal.shape)}")
@@ -157,12 +163,13 @@ class ButterworthBandpass:
             self.reset(frame.shape)
 
         original_shape = frame.shape
-        flat = frame.float().cpu().numpy().flatten()  # (N,)
+        flat = np.from_dlpack(
+            frame.detach().float().cpu().contiguous()
+        ).flatten()  # (N,)
         # sosfilt with zi: input shape (N,) treated as (N, 1)
         filtered_flat, self._zi = sosfilt(
             self._sos, flat[np.newaxis, :], axis=0, zi=self._zi
         )
-        result = torch.from_numpy(filtered_flat[0].reshape(original_shape)).to(
-            device=frame.device, dtype=frame.dtype
-        )
+        out_c = np.ascontiguousarray(filtered_flat[0].reshape(original_shape), dtype=np.float32)
+        result = torch.from_dlpack(out_c).to(device=frame.device, dtype=frame.dtype)
         return result

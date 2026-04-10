@@ -67,14 +67,14 @@ def _setup_logging(debug: bool) -> None:
 
 def _get_device(device_str: str | None) -> "torch.device":  # noqa: F821
     import torch  # noqa: PLC0415
-    from evm.device import get_device  # noqa: PLC0415
+    from pyevm.device import get_device  # noqa: PLC0415
     if device_str is not None:
         return torch.device(device_str)
     return get_device()
 
 
 def _load_video(input_path: Path, device: "torch.device", max_frames: int | None):  # noqa: F821
-    from evm.io.video import VideoReader  # noqa: PLC0415
+    from pyevm.io.video import VideoReader  # noqa: PLC0415
     reader = VideoReader(input_path, device=device, max_frames=max_frames)
     logger.info(f"Loading video: {input_path}")
     frames, fps = reader.read()
@@ -87,7 +87,7 @@ def _load_video(input_path: Path, device: "torch.device", max_frames: int | None
 
 
 def _save_video(frames: "torch.Tensor", output_path: Path, fps: float) -> None:  # noqa: F821
-    from evm.io.video import VideoWriter  # noqa: PLC0415
+    from pyevm.io.video import VideoWriter  # noqa: PLC0415
     writer = VideoWriter(output_path, fps=fps)
     logger.info(f"Saving result → {output_path}")
     writer.write(frames)
@@ -115,7 +115,7 @@ def color(
 ) -> None:
     """Colour-based EVM — amplifies subtle colour changes (e.g. pulse)."""
     _setup_logging(debug)
-    from evm.magnification.color import ColorMagnifier  # noqa: PLC0415
+    from pyevm.magnification.color import ColorMagnifier  # noqa: PLC0415
     dev = _get_device(device)
     frames, fps = _load_video(input, dev, max_frames)
     magnifier = ColorMagnifier(
@@ -148,7 +148,7 @@ def motion(
 ) -> None:
     """Motion-based EVM — amplifies subtle physical motion (e.g. breathing, vibrations)."""
     _setup_logging(debug)
-    from evm.magnification.motion import MotionMagnifier  # noqa: PLC0415
+    from pyevm.magnification.motion import MotionMagnifier  # noqa: PLC0415
     dev = _get_device(device)
     frames, fps = _load_video(input, dev, max_frames)
     magnifier = MotionMagnifier(
@@ -181,7 +181,7 @@ def phase(
 ) -> None:
     """Phase-based EVM — artifact-free motion magnification (Wadhwa et al. 2013)."""
     _setup_logging(debug)
-    from evm.magnification.phase import PhaseMagnifier  # noqa: PLC0415
+    from pyevm.magnification.phase import PhaseMagnifier  # noqa: PLC0415
     dev = _get_device(device)
     frames, fps = _load_video(input, dev, max_frames)
     magnifier = PhaseMagnifier(
@@ -206,7 +206,7 @@ def info(
     """Show detected compute device and package information."""
     _setup_logging(debug)
     import torch  # noqa: PLC0415
-    from evm.device import device_info, get_device  # noqa: PLC0415
+    from pyevm.device import device_info, get_device  # noqa: PLC0415
     dev = _get_device(device)
     di = device_info(dev)
     typer.echo("EVM — Eulerian Video Magnification")

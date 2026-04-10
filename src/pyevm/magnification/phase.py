@@ -22,9 +22,9 @@ from __future__ import annotations
 import torch
 from loguru import logger
 
-from evm.filters.temporal import ButterworthBandpass, IdealBandpass
-from evm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
-from evm.pyramids.steerable import SteerablePyramid
+from pyevm.filters.temporal import ButterworthBandpass, IdealBandpass
+from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
+from pyevm.pyramids.steerable import SteerablePyramid
 
 
 class PhaseMagnifier:

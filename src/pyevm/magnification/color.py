@@ -17,9 +17,9 @@ from __future__ import annotations
 import torch
 from loguru import logger
 
-from evm.filters.temporal import ButterworthBandpass, IdealBandpass
-from evm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
-from evm.pyramids.gaussian import GaussianPyramid
+from pyevm.filters.temporal import ButterworthBandpass, IdealBandpass
+from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
+from pyevm.pyramids.gaussian import GaussianPyramid
 
 
 class ColorMagnifier:
@@ -114,11 +114,11 @@ class ColorMagnifier:
         # --- Upsample amplified signal back to original resolution ---
         # We upsample the coarsest-level amplified signal to full resolution
         upsampled = torch.nn.functional.interpolate(
-            amplified.view(T * 3, 1, *amplified.shape[2:]),
+            amplified.reshape(T * 3, 1, *amplified.shape[2:]),
             size=(H, W),
             mode="bilinear",
             align_corners=False,
-        ).view(T, 3, H, W)
+        ).reshape(T, 3, H, W)
 
         # --- Add to original YIQ ---
         result_yiq = yiq + upsampled

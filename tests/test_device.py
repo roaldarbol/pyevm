@@ -2,7 +2,7 @@
 
 import torch
 import pytest
-from evm.device import get_device, device_info
+from pyevm.device import get_device, device_info
 
 
 def test_get_device_cpu_forced():

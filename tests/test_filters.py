@@ -3,7 +3,7 @@
 import math
 import torch
 import pytest
-from evm.filters.temporal import IdealBandpass, ButterworthBandpass
+from pyevm.filters.temporal import IdealBandpass, ButterworthBandpass
 
 
 FPS = 30.0

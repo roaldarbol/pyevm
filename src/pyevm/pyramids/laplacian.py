@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from loguru import logger
 
-from evm.pyramids.gaussian import _blur_downsample, _gaussian_kernel, _upsample_blur
+from pyevm.pyramids.gaussian import _blur_downsample, _gaussian_kernel, _upsample_blur
 
 
 class LaplacianPyramid:
