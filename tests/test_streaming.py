@@ -75,7 +75,11 @@ class TestColorMagnifierStream:
     def test_matches_batch_butterworth(self, small_video):
         """Stream output must match batch process() when both use Butterworth."""
         kwargs = {
-            "alpha": 10.0, "freq_low": 0.5, "freq_high": 3.0, "n_levels": 3, "filter_type": "butterworth"
+            "alpha": 10.0,
+            "freq_low": 0.5,
+            "freq_high": 3.0,
+            "n_levels": 3,
+            "filter_type": "butterworth",
         }
         batch_out = ColorMagnifier(**kwargs).process(small_video, FPS)
         stream_out = _collect(
@@ -141,7 +145,11 @@ class TestMotionMagnifierStream:
     def test_matches_batch_butterworth(self, small_video):
         """Stream output must match batch process() (both use Butterworth by default)."""
         kwargs = {
-            "alpha": 10.0, "freq_low": 0.5, "freq_high": 3.0, "n_levels": 3, "filter_type": "butterworth"
+            "alpha": 10.0,
+            "freq_low": 0.5,
+            "freq_high": 3.0,
+            "n_levels": 3,
+            "filter_type": "butterworth",
         }
         batch_out = MotionMagnifier(**kwargs).process(small_video, FPS)
         stream_out = _collect(
@@ -205,7 +213,13 @@ class TestPhaseMagnifierStream:
 
     def test_chunk_boundary_consistency(self, small_video):
         """Different chunk sizes must give the same output (IIR state preserved)."""
-        kwargs = {"factor": 2.0, "freq_low": 0.5, "freq_high": 3.0, "n_scales": 2, "n_orientations": 4}
+        kwargs = {
+            "factor": 2.0,
+            "freq_low": 0.5,
+            "freq_high": 3.0,
+            "n_scales": 2,
+            "n_orientations": 4,
+        }
         out_8 = _collect(
             PhaseMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8)
         )
