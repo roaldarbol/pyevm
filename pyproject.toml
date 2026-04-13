@@ -22,7 +22,7 @@ dependencies = [
 # pip wheels are Linux-only. On Windows use pixi (see pixi.toml), which
 # installs torchcodec from conda-forge where Windows CUDA builds exist.
 fast-io = [
-    "torchcodec>=0.10.0; sys_platform != 'win32'",
+    "torchcodec>=0.11.0; sys_platform != 'win32'",
 ]
 dev = [
     "pytest>=8.0.0",
