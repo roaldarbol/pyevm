@@ -189,34 +189,37 @@ class SteerablePyramid:
     # ------------------------------------------------------------------
 
     def build(self, frame: torch.Tensor) -> dict:
-        """Decompose a single-channel frame into the complex steerable pyramid.
+        """Decompose one or more single-channel frames into the complex steerable pyramid.
 
         Args:
-            frame: ``(H, W)`` or ``(1, 1, H, W)`` real tensor.
+            frame: ``(H, W)``, ``(1, H, W)`` / ``(1, 1, H, W)`` for a single
+                   frame, or ``(T, H, W)`` to process a batch of *T* frames in
+                   one GPU call.
 
         Returns:
             Dictionary with keys:
 
-            * ``"highpass"``  – ``(H, W)`` complex tensor (outer HP residual).
-            * ``"lowpass"``   – ``(H', W')`` real tensor (coarsest LP residual).
-            * ``"subbands"``  – ``[n_scales][n_orientations]`` complex tensors.
+            * ``"highpass"``  – ``(..., H, W)`` complex tensor (outer HP residual).
+            * ``"lowpass"``   – ``(..., H', W')`` real tensor (coarsest LP residual).
+            * ``"subbands"``  – ``[n_scales][n_orientations]`` complex tensors of
+                               shape ``(..., H_s, W_s)``.
             * ``"sizes"``     – ``(H_s, W_s)`` at each scale.
         """
-        if frame.dim() == 4:
-            frame = frame.squeeze(0).squeeze(0)
-        elif frame.dim() == 3:
+        frame = frame.to(device=self.device, dtype=self.dtype)
+        # Collapse trivial leading singleton dims so a single (1,H,W) or (1,1,H,W)
+        # still behaves as (H,W); a genuine (T,H,W) batch is left untouched.
+        while frame.dim() > 2 and frame.shape[0] == 1:
             frame = frame.squeeze(0)
 
-        frame = frame.to(device=self.device, dtype=self.dtype)
-        H, W = frame.shape
-        dft = torch.fft.fft2(frame)
+        H, W = frame.shape[-2], frame.shape[-1]
+        dft = torch.fft.fft2(frame)  # (..., H, W) complex
 
         # --- Outer LP/HP split ---
         radius0, _ = _polar_grid(H, W, self.device, self.dtype)
         lo0_vals = _lo0(radius0)
         hi0_vals = _hi0(lo0_vals)
 
-        highpass = torch.fft.ifft2(dft * hi0_vals)
+        highpass = torch.fft.ifft2(dft * hi0_vals)  # (..., H, W) complex
         logger.debug(f"Highpass residual: {tuple(highpass.shape)}")
 
         # Scale loop starts from the LP component only
@@ -315,28 +318,38 @@ class SteerablePyramid:
 
     @staticmethod
     def _downsample_dft(dft: torch.Tensor, new_h: int, new_w: int) -> torch.Tensor:
-        """Crop DFT spectrum to ``(new_h, new_w)`` — bandlimited downsampling."""
-        H, W = dft.shape
-        shifted = torch.fft.fftshift(dft)
+        """Crop DFT spectrum to ``(new_h, new_w)`` — bandlimited downsampling.
+
+        Works for both ``(H, W)`` and batched ``(..., H, W)`` inputs.
+        """
+        H, W = dft.shape[-2], dft.shape[-1]
+        shifted = torch.fft.fftshift(dft, dim=(-2, -1))
         ch, cw = H // 2, W // 2
         half_h, half_w = new_h // 2, new_w // 2
-        cropped = shifted[
+        cropped = shifted[...,
             ch - half_h: ch - half_h + new_h,
             cw - half_w: cw - half_w + new_w,
         ]
-        return torch.fft.ifftshift(cropped)
+        return torch.fft.ifftshift(cropped, dim=(-2, -1))
 
     @staticmethod
     def _upsample_dft(dft: torch.Tensor, new_h: int, new_w: int) -> torch.Tensor:
         """Zero-pad DFT spectrum to ``(new_h, new_w)`` — bandlimited upsampling.
 
-        No amplitude scaling: for a band-limited signal the crop→pad roundtrip
-        is the identity, so the DFT values themselves need no rescaling.
+        The DC component (after fftshift) sits at ``H // 2`` in the source and
+        must land at ``new_h // 2`` in the destination.  Using
+        ``ph = new_h // 2 - H // 2`` (rather than ``(new_h - H) // 2``)
+        handles the case where *H* is odd and *new_h = 2 H* correctly — the
+        naive formula is off by one for that combination, which creates a
+        one-pixel phase error that propagates as visible artefacts (e.g. a
+        black bar across 1080 p video where height reaches 135 px at scale 3).
+
+        Works for both ``(H, W)`` and batched ``(..., H, W)`` inputs.
         """
-        H, W = dft.shape
-        shifted = torch.fft.fftshift(dft)
-        padded = torch.zeros(new_h, new_w, dtype=dft.dtype, device=dft.device)
-        ph = (new_h - H) // 2
-        pw = (new_w - W) // 2
-        padded[ph: ph + H, pw: pw + W] = shifted
-        return torch.fft.ifftshift(padded)
+        H, W = dft.shape[-2], dft.shape[-1]
+        shifted = torch.fft.fftshift(dft, dim=(-2, -1))
+        padded = torch.zeros(*dft.shape[:-2], new_h, new_w, dtype=dft.dtype, device=dft.device)
+        ph = new_h // 2 - H // 2
+        pw = new_w // 2 - W // 2
+        padded[..., ph: ph + H, pw: pw + W] = shifted
+        return torch.fft.ifftshift(padded, dim=(-2, -1))

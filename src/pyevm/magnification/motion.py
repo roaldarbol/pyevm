@@ -16,9 +16,12 @@ This algorithm is best for subtle *motion* (e.g. vibrations, breathing).
 from __future__ import annotations
 
 import math
+import time
+from collections.abc import Generator, Iterable
 
 import torch
 from loguru import logger
+from tqdm import tqdm
 
 from pyevm.filters.temporal import ButterworthBandpass, IdealBandpass
 from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
@@ -70,11 +73,16 @@ class MotionMagnifier:
     def _alpha_for_level(self, level: int) -> float:
         """Compute spatially-adaptive alpha for *level*.
 
-        The spatial wavelength at level *i* is ``2^i`` pixels (at full
-        resolution).  We clamp alpha so that amplified motion doesn't alias.
+        The spatial wavelength at level *i* is ``2^(i+1)`` pixels at full
+        resolution (level 0 = finest, λ = 2 px; level 5 = coarsest, λ = 64 px).
+
+        Fine levels (λ < λ_c) are suppressed to avoid amplifying noise and
+        aliasing artefacts.  Coarser levels receive progressively higher
+        amplification up to *alpha*.  The crossover is at λ = λ_c / 8; above
+        that the cap grows linearly.
         """
         lambda_at_level = 2 ** (level + 1)
-        alpha_max = self.lambda_c / (8.0 * lambda_at_level) - 1.0
+        alpha_max = 8.0 * lambda_at_level / self.lambda_c - 1.0
         alpha_eff = min(self.alpha, alpha_max) if alpha_max > 0 else 0.0
         logger.debug(f"  Level {level}: lambda={lambda_at_level}, alpha_eff={alpha_eff:.2f}")
         return alpha_eff
@@ -144,3 +152,92 @@ class MotionMagnifier:
         result_rgb = yiq_to_rgb(result_yiq).clamp(0.0, 1.0)
         logger.info("MotionMagnifier.process complete")
         return result_rgb
+
+    def process_stream(
+        self,
+        frames: Iterable[torch.Tensor],
+        fps: float,
+        n_frames: int | None = None,
+        chunk_size: int = 64,
+    ) -> Generator[torch.Tensor, None, None]:
+        """Process frames in chunks, yielding each output frame.
+
+        Uses Butterworth IIR regardless of *filter_type* (the ideal FFT filter
+        requires all frames at once and cannot be used in streaming mode).
+
+        Args:
+            frames: Iterable of ``(C, H, W)`` float32 RGB tensors on any device.
+            fps: Frames per second.
+            n_frames: Total frame count (optional, used for the progress bar).
+            chunk_size: Number of frames to process per GPU batch.
+
+        Yields:
+            Amplified ``(C, H, W)`` float32 RGB tensors, clamped to ``[0, 1]``.
+        """
+        # One filter per pyramid level; state carries across chunk boundaries
+        filters = [
+            ButterworthBandpass(fps, self.freq_low, self.freq_high)
+            for _ in range(self.n_levels)
+        ]
+        # Precompute per-level alpha
+        alphas = [self._alpha_for_level(lvl) for lvl in range(self.n_levels)]
+
+        def _process_chunk(chunk: list[torch.Tensor]) -> Generator[torch.Tensor, None, None]:
+            N = len(chunk)
+            batch = torch.stack(chunk)      # (N, C, H, W)
+
+            t0 = time.perf_counter()
+            yiq   = rgb_to_yiq(batch)       # (N, 3, H, W)
+            levels = self._pyramid.build(yiq)   # list of n_levels × (N, 3, h_l, w_l)
+            t_build = time.perf_counter() - t0
+
+            t_filter_lvl: list[float] = []
+            modified_levels = []
+            for lvl in range(self.n_levels):
+                level_t = levels[lvl]                               # (N, 3, h_l, w_l)
+                if alphas[lvl] == 0.0:
+                    # Skip IIR call entirely; still advance state so timing is consistent
+                    modified_levels.append(level_t)
+                    t_filter_lvl.append(0.0)
+                else:
+                    tf = time.perf_counter()
+                    filtered = filters[lvl].apply_chunk(level_t)    # (N, 3, h_l, w_l)
+                    t_filter_lvl.append(time.perf_counter() - tf)
+                    modified_levels.append(level_t + filtered * alphas[lvl])
+
+            t1 = time.perf_counter()
+            result_yiq = self._pyramid.collapse(modified_levels)    # (N, 3, H, W)
+            result_rgb = yiq_to_rgb(result_yiq).clamp(0.0, 1.0)    # (N, C, H, W)
+            t_collapse = time.perf_counter() - t1
+
+            total_filter = sum(t_filter_lvl)
+            per_lvl = "  ".join(
+                f"L{i}={ms*1000:.1f}ms" for i, ms in enumerate(t_filter_lvl)
+            )
+            logger.debug(
+                f"  [motion chunk N={N}]  "
+                f"build={t_build*1000:.1f}ms  "
+                f"filter_total={total_filter*1000:.1f}ms ({per_lvl})  "
+                f"collapse={t_collapse*1000:.1f}ms"
+            )
+            yield from result_rgb
+
+        chunk: list[torch.Tensor] = []
+        with tqdm(total=n_frames, desc="Magnifying", unit="frame", position=1, leave=True) as bar:
+            for frame in frames:
+                chunk.append(frame.to(device=self.device, dtype=self.dtype))
+                if len(chunk) == chunk_size:
+                    t0 = time.perf_counter()
+                    for out_frame in _process_chunk(chunk):
+                        yield out_frame
+                        bar.update(1)
+                    elapsed = time.perf_counter() - t0
+                    logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")
+                    chunk = []
+            if chunk:
+                t0 = time.perf_counter()
+                for out_frame in _process_chunk(chunk):
+                    yield out_frame
+                    bar.update(1)
+                elapsed = time.perf_counter() - t0
+                logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")

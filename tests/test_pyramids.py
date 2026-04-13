@@ -156,3 +156,23 @@ class TestSteerablePyramid:
             for band in scale_bands:
                 phase = torch.angle(band)
                 assert torch.isfinite(phase).all(), "Phase contains non-finite values"
+
+    def test_reconstruction_fidelity_odd_height(self, cpu_device):
+        """Round-trip must be accurate for inputs whose height becomes odd after downsampling.
+
+        1080p video has height 1080 → 540 → 270 → 135 (odd) at scale 3.
+        A wrong ``ph`` in ``_upsample_dft`` (off by 1) when going from 135→270
+        creates a one-pixel phase error that manifests as a visible black bar.
+        This test catches that regression.
+        """
+        torch.manual_seed(9)
+        # Use height=270 so one downsample gives 135 (odd) and the next upsample is 135→270
+        luma = torch.rand(270, 480, device=cpu_device)
+        pyr = SteerablePyramid(n_scales=3, n_orientations=4, device=cpu_device)
+        pyramid = pyr.build(luma)
+        reconstructed = pyr.collapse(pyramid)
+        max_err = (reconstructed - luma).abs().max().item()
+        assert max_err < 0.05, (
+            f"Reconstruction error {max_err:.4f} too large for odd-height input "
+            f"(likely off-by-one in _upsample_dft)"
+        )

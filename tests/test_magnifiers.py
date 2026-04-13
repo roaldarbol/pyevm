@@ -96,11 +96,14 @@ class TestMotionMagnifier:
         assert out.shape == small_video.shape
 
     def test_adaptive_alpha_clamps(self):
-        """Adaptive alpha should reduce to 0 for very coarse levels with large lambda_c."""
-        mag = MotionMagnifier(alpha=1000.0, lambda_c=4.0, n_levels=4)
-        # At level 3, lambda = 16 px → alpha_max = 4/(8*16) - 1 < 0 → clamps to 0
-        alpha_eff = mag._alpha_for_level(3)
-        assert alpha_eff == 0.0
+        """Fine levels are suppressed; coarser levels receive increasing amplification."""
+        mag = MotionMagnifier(alpha=20.0, lambda_c=16.0, n_levels=6)
+        # Finest level (lambda=2 px): alpha_max = 8*2/16 - 1 = 0 → clamped to 0
+        assert mag._alpha_for_level(0) == 0.0
+        # Mid level (lambda=16 px): alpha_max = 8*16/16 - 1 = 7 → alpha_eff = 7
+        assert mag._alpha_for_level(3) == 7.0
+        # Coarsest level (lambda=64 px): alpha_max = 31, clamped to alpha=20
+        assert mag._alpha_for_level(5) == 20.0
 
     def test_output_dtype(self, small_video):
         mag = MotionMagnifier(n_levels=3)

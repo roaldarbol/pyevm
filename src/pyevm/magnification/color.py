@@ -14,8 +14,13 @@ This algorithm is best for subtle *colour* changes (e.g. skin-tone pulse).
 
 from __future__ import annotations
 
+import time
+from collections.abc import Generator, Iterable
+
 import torch
+import torch.nn.functional as F
 from loguru import logger
+from tqdm import tqdm
 
 from pyevm.filters.temporal import ButterworthBandpass, IdealBandpass
 from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
@@ -127,3 +132,88 @@ class ColorMagnifier:
         result_rgb = yiq_to_rgb(result_yiq).clamp(0.0, 1.0)
         logger.info("ColorMagnifier.process complete")
         return result_rgb
+
+    def process_stream(
+        self,
+        frames: Iterable[torch.Tensor],
+        fps: float,
+        n_frames: int | None = None,
+        chunk_size: int = 64,
+    ) -> Generator[torch.Tensor, None, None]:
+        """Process frames in chunks, yielding each output frame.
+
+        Uses Butterworth IIR regardless of *filter_type* (the ideal FFT filter
+        requires all frames at once and cannot be used in streaming mode).
+
+        Args:
+            frames: Iterable of ``(C, H, W)`` float32 RGB tensors on any device.
+            fps: Frames per second.
+            n_frames: Total frame count (optional, used for the progress bar).
+            chunk_size: Number of frames to process per GPU batch.
+
+        Yields:
+            Amplified ``(C, H, W)`` float32 RGB tensors, clamped to ``[0, 1]``.
+        """
+        filt = ButterworthBandpass(fps, self.freq_low, self.freq_high)
+
+        def _process_chunk(chunk: list[torch.Tensor]) -> Generator[torch.Tensor, None, None]:
+            batch = torch.stack(chunk)          # (N, C, H, W)
+            N, C, H, W = batch.shape
+
+            t0 = time.perf_counter()
+            yiq = rgb_to_yiq(batch)             # (N, 3, H, W)
+            levels = self._pyramid.build(yiq)   # list of (N, 3, h, w)
+            level_t = levels[self.pyramid_level]  # (N, 3, h, w)
+            t_build = time.perf_counter() - t0
+
+            # Temporal filter (state carried across chunks via filt._zi)
+            t1 = time.perf_counter()
+            filtered = filt.apply_chunk(level_t)  # (N, 3, h, w)
+            t_filter = time.perf_counter() - t1
+
+            # Amplify: Y × alpha, I/Q × alpha × chrom_attenuation
+            t2 = time.perf_counter()
+            amplified = filtered.clone()
+            amplified[:, 0] *= self.alpha
+            amplified[:, 1:] *= self.alpha * self.chrom_attenuation
+
+            # Upsample amplified signal back to original resolution
+            _, _, h, w = amplified.shape
+            upsampled = F.interpolate(
+                amplified.reshape(N * 3, 1, h, w),
+                size=(H, W),
+                mode="bilinear",
+                align_corners=False,
+            ).reshape(N, 3, H, W)
+
+            result_yiq = yiq + upsampled
+            result_rgb = yiq_to_rgb(result_yiq).clamp(0.0, 1.0)  # (N, C, H, W)
+            t_reconstruct = time.perf_counter() - t2
+
+            logger.debug(
+                f"  [color chunk N={N}]  "
+                f"build={t_build*1000:.1f}ms  "
+                f"filter={t_filter*1000:.1f}ms  "
+                f"reconstruct={t_reconstruct*1000:.1f}ms"
+            )
+            yield from result_rgb
+
+        chunk: list[torch.Tensor] = []
+        with tqdm(total=n_frames, desc="Magnifying", unit="frame", position=1, leave=True) as bar:
+            for frame in frames:
+                chunk.append(frame.to(device=self.device, dtype=self.dtype))
+                if len(chunk) == chunk_size:
+                    t0 = time.perf_counter()
+                    for out_frame in _process_chunk(chunk):
+                        yield out_frame
+                        bar.update(1)
+                    elapsed = time.perf_counter() - t0
+                    logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")
+                    chunk = []
+            if chunk:
+                t0 = time.perf_counter()
+                for out_frame in _process_chunk(chunk):
+                    yield out_frame
+                    bar.update(1)
+                elapsed = time.perf_counter() - t0
+                logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")

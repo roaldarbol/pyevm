@@ -1,0 +1,60 @@
+# pixi.toml — development environment for pyevm
+#
+# Use this instead of uv when you want GPU-accelerated video decoding via
+# torchcodec.  torchcodec has no Windows pip wheels, but conda-forge ships
+# Windows CUDA builds.
+#
+# Install pixi:  https://pixi.sh
+# Setup:         pixi install
+# Run CLI:       pixi run pyevm phase input.mp4 output.mp4
+# Run tests:     pixi run test
+
+[workspace]
+name      = "pyevm"
+version   = "0.1.0"
+channels  = ["conda-forge"]
+platforms = ["win-64", "linux-64", "osx-64"]
+
+# ---------------------------------------------------------------------------
+# Conda dependencies
+# ---------------------------------------------------------------------------
+
+[system-requirements]
+cuda = "12.8"  # driver 591.86 supports up to CUDA 13.1; toolkit 12.8 is what torch uses
+
+[dependencies]
+python = ">=3.12,<3.14"
+
+# conda-forge lags pip by weeks; pin to the latest available version (2.10).
+# When conda-forge catches up to 2.11, bump pytorch and torchcodec together.
+pytorch = "2.10.*"
+
+# torchcodec — CUDA build on win-64/linux-64, CPU build on osx-64.
+# Version must match the pytorch version above (0.10 ↔ pytorch 2.10).
+[target.win-64.dependencies]
+torchcodec = { version = "0.10.*", build = "*cuda*" }
+
+[target.linux-64.dependencies]
+torchcodec = { version = "0.10.*", build = "*cuda*" }
+
+[target.osx-64.dependencies]
+torchcodec = { version = "0.10.*" }  # CPU-only build
+
+# ---------------------------------------------------------------------------
+# PyPI dependencies
+# ---------------------------------------------------------------------------
+# Everything else is pip-only or works best from PyPI.
+
+[pypi-dependencies]
+# Install the project itself in editable mode.
+# torch is already satisfied by the conda pytorch package above, so pip
+# will skip it when resolving pyevm's dependencies.
+pyevm = { path = ".", editable = true, extras = ["dev"] }
+
+# ---------------------------------------------------------------------------
+# Tasks
+# ---------------------------------------------------------------------------
+
+[tasks]
+test  = "python -m pytest"
+pyevm = "python -m pyevm.cli"

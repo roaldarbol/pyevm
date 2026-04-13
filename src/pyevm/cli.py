@@ -110,14 +110,26 @@ def color(
     pyramid_level: Annotated[Optional[int], typer.Option("--pyramid-level", help="Pyramid level to filter.")] = None,
     filter_type: Annotated[str, typer.Option("--filter", help="'ideal' or 'butterworth'.")] = "ideal",
     max_frames: Annotated[Optional[int], typer.Option("--max-frames", help="Limit frames read.")] = None,
+    chunk_size: Annotated[int, typer.Option("--chunk-size", help="Frames per GPU batch.")] = 64,
     device: _DeviceOption = None,
     debug: _DebugOption = False,
 ) -> None:
     """Colour-based EVM — amplifies subtle colour changes (e.g. pulse)."""
     _setup_logging(debug)
+    from pyevm.io.video import VideoReader, VideoWriter  # noqa: PLC0415
     from pyevm.magnification.color import ColorMagnifier  # noqa: PLC0415
+
     dev = _get_device(device)
-    frames, fps = _load_video(input, dev, max_frames)
+
+    reader = VideoReader(input, device=dev, max_frames=max_frames)
+    meta   = reader.metadata
+    fps    = meta["fps"]
+    logger.info(f"Loading video: {input}")
+    logger.info(
+        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
+        f"{meta['width']}×{meta['height']} px"
+    )
+
     magnifier = ColorMagnifier(
         alpha=alpha,
         freq_low=freq_low,
@@ -128,8 +140,20 @@ def color(
         filter_type=filter_type,
         device=dev,
     )
-    result = magnifier.process(frames, fps)
-    _save_video(result, output, fps)
+
+    n_out = min(max_frames, meta["n_frames"]) if max_frames is not None else meta["n_frames"]
+    frame_stream     = reader.stream()
+    processed_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_out, chunk_size=chunk_size)
+
+    logger.info(f"Saving result → {output}")
+    writer = VideoWriter(output, fps=fps)
+    writer.write_stream(
+        processed_stream,
+        height=meta["height"],
+        width=meta["width"],
+        n_frames=n_out,
+    )
+    logger.info("Done.")
 
 
 @app.command()
@@ -143,14 +167,26 @@ def motion(
     lambda_c: Annotated[float, typer.Option("--lambda-c", help="Spatial wavelength cutoff (px).")] = 16.0,
     filter_type: Annotated[str, typer.Option("--filter", help="'butterworth' or 'ideal'.")] = "butterworth",
     max_frames: Annotated[Optional[int], typer.Option("--max-frames", help="Limit frames read.")] = None,
+    chunk_size: Annotated[int, typer.Option("--chunk-size", help="Frames per GPU batch.")] = 64,
     device: _DeviceOption = None,
     debug: _DebugOption = False,
 ) -> None:
     """Motion-based EVM — amplifies subtle physical motion (e.g. breathing, vibrations)."""
     _setup_logging(debug)
+    from pyevm.io.video import VideoReader, VideoWriter  # noqa: PLC0415
     from pyevm.magnification.motion import MotionMagnifier  # noqa: PLC0415
+
     dev = _get_device(device)
-    frames, fps = _load_video(input, dev, max_frames)
+
+    reader = VideoReader(input, device=dev, max_frames=max_frames)
+    meta   = reader.metadata
+    fps    = meta["fps"]
+    logger.info(f"Loading video: {input}")
+    logger.info(
+        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
+        f"{meta['width']}×{meta['height']} px"
+    )
+
     magnifier = MotionMagnifier(
         alpha=alpha,
         freq_low=freq_low,
@@ -160,8 +196,20 @@ def motion(
         filter_type=filter_type,
         device=dev,
     )
-    result = magnifier.process(frames, fps)
-    _save_video(result, output, fps)
+
+    n_out = min(max_frames, meta["n_frames"]) if max_frames is not None else meta["n_frames"]
+    frame_stream     = reader.stream()
+    processed_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_out, chunk_size=chunk_size)
+
+    logger.info(f"Saving result → {output}")
+    writer = VideoWriter(output, fps=fps)
+    writer.write_stream(
+        processed_stream,
+        height=meta["height"],
+        width=meta["width"],
+        n_frames=n_out,
+    )
+    logger.info("Done.")
 
 
 @app.command()
@@ -176,14 +224,30 @@ def phase(
     sigma: Annotated[float, typer.Option(help="Spatial phase smoothing (0 = off).")] = 3.0,
     filter_type: Annotated[str, typer.Option("--filter", help="'ideal' or 'butterworth'.")] = "ideal",
     max_frames: Annotated[Optional[int], typer.Option("--max-frames", help="Limit frames read.")] = None,
+    chunk_size: Annotated[int, typer.Option("--chunk-size", help="Frames per GPU batch. Larger = faster but more VRAM (64 ≈ 10 GB at 1080p).")] = 64,
     device: _DeviceOption = None,
     debug: _DebugOption = False,
 ) -> None:
-    """Phase-based EVM — artifact-free motion magnification (Wadhwa et al. 2013)."""
+    """Phase-based EVM — artifact-free motion magnification (Wadhwa et al. 2013).
+
+    Processes frames in chunks through the batched GPU pyramid, so throughput
+    scales well without loading the full video into memory.
+    """
     _setup_logging(debug)
+    from pyevm.io.video import VideoReader, VideoWriter  # noqa: PLC0415
     from pyevm.magnification.phase import PhaseMagnifier  # noqa: PLC0415
+
     dev = _get_device(device)
-    frames, fps = _load_video(input, dev, max_frames)
+
+    reader = VideoReader(input, device=dev, max_frames=max_frames)
+    meta   = reader.metadata
+    fps    = meta["fps"]
+    logger.info(f"Loading video: {input}")
+    logger.info(
+        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
+        f"{meta['width']}×{meta['height']} px"
+    )
+
     magnifier = PhaseMagnifier(
         factor=factor,
         freq_low=freq_low,
@@ -194,8 +258,20 @@ def phase(
         filter_type=filter_type,
         device=dev,
     )
-    result = magnifier.process(frames, fps)
-    _save_video(result, output, fps)
+
+    n_out = min(max_frames, meta["n_frames"]) if max_frames is not None else meta["n_frames"]
+    frame_stream     = reader.stream()
+    processed_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_out, chunk_size=chunk_size)
+
+    logger.info(f"Saving result → {output}")
+    writer = VideoWriter(output, fps=fps)
+    writer.write_stream(
+        processed_stream,
+        height=meta["height"],
+        width=meta["width"],
+        n_frames=n_out,
+    )
+    logger.info("Done.")
 
 
 @app.command()
