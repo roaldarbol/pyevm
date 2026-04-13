@@ -109,14 +109,17 @@ pyevm phase input.mp4 output.mp4 --factor 10 --freq-low 0.4 --freq-high 3.0
 
 # Inspect detected compute device
 pyevm info
+
+# Launch the interactive dashboard
+pyevm dashboard
 ```
 
 Add `--debug` to any command for verbose logging, including per-chunk timing breakdowns (pyramid build / filter / collapse) to identify performance bottlenecks.
 
-### Streamlit app
+### Streamlit dashboard
 
 ```bash
-streamlit run src/pyevm/app/streamlit_app.py
+pyevm dashboard
 ```
 
 ## CLI reference
@@ -170,6 +173,10 @@ Artifact-free motion magnification via steerable pyramid phase decomposition.
 | `--chunk-size` | `64` | Frames per GPU batch (64 ≈ 10 GB VRAM at 1080p) |
 | `--max-frames` | — | Limit number of frames read |
 | `--device` | auto | Compute device: `cuda`, `mps`, or `cpu` |
+
+### `pyevm dashboard`
+
+Opens the interactive Streamlit dashboard in a browser. Requires `streamlit` to be installed (`pip install streamlit`).
 
 ### `pyevm info`
 

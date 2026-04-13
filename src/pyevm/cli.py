@@ -16,6 +16,9 @@ Usage examples
     # Inspect device (shows which GPU/CPU will be used)
     evm info
 
+    # Launch the interactive Streamlit dashboard
+    evm dashboard
+
 Add ``--debug`` to any command for verbose logging.
 """
 
@@ -293,6 +296,26 @@ def info(
         typer.echo(f"  VRAM            : {di['vram_gb']} GB")
     typer.echo(f"  CUDA available  : {torch.cuda.is_available()}")
     typer.echo(f"  MPS available   : {torch.backends.mps.is_available()}")
+
+
+@app.command()
+def dashboard() -> None:
+    """Launch the Streamlit dashboard in a browser."""
+    try:
+        import streamlit.web.cli as stcli  # noqa: PLC0415
+    except ImportError:
+        typer.echo(
+            "Streamlit is not installed. Install it with:\n"
+            "  pip install streamlit",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    import importlib.resources  # noqa: PLC0415
+
+    app_path = importlib.resources.files("pyevm.app").joinpath("streamlit_app.py")
+    sys.argv = ["streamlit", "run", str(app_path), "--server.headless", "false"]
+    sys.exit(stcli.main())
 
 
 if __name__ == "__main__":
