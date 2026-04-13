@@ -5,16 +5,31 @@ Algorithm
 1. Convert video frames to YIQ; work on the luminance channel (Y).
 2. Build a complex steerable pyramid for each frame.
 3. For each sub-band (scale × orientation):
-   a. Extract phase:          φ(t) = angle(coeff(t))
-   b. Compute phase delta:    Δφ(t) = φ(t) − φ(0)  (remove DC)
-   c. Temporally filter Δφ to isolate the motion frequency band.
-   d. Amplify:                Δφ_amp(t) = factor × Δφ_filtered(t)
-   e. Shift coefficient:      coeff'(t) = |coeff(t)| × exp(j·(φ(t) + Δφ_amp(t)))
+   a. Extract amplitude and phase: A = |coeff|, φ = angle(coeff)
+   b. Phase delta:  Δφ(t) = φ(t) − φ(0)  (remove reference-frame offset)
+   c. Temporal bandpass filter Δφ → B(t)  (isolate motion frequency band)
+   d. Amplitude-weighted spatial smoothing of B(t)  (Eq. 17, optional)
+      Smoothing increases phase SNR; amplitude-weighting prevents low-amplitude
+      (noisy-phase) regions from corrupting neighbouring signal.
+   e. Amplify:   amp(t) = factor × B(t)
+   f. Shift coeff:  coeff'(t) = A(t) × exp(j·(φ(t) + amp(t)))
 4. Reconstruct Y from modified pyramid for each frame.
 5. Recombine with I, Q channels and convert back to RGB.
 
-This algorithm handles *larger* amplifications with far fewer artefacts than
-the linear (colour / motion) method.
+Key correctness notes (vs. a naïve implementation)
+----------------------------------------------------
+* **Amplitude-weighted smoothing** (Eq. 17): the Gaussian blur is weighted by
+  the local coefficient amplitude A.  Pixels where A ≈ 0 (flat/uniform
+  regions, e.g. blue sky) have meaningless phase; equal-weight blurring
+  spreads that noise onto high-contrast neighbours, which is catastrophic at
+  large amplification factors.
+
+* **Smoothing order**: temporal filtering comes *first*, then spatial
+  smoothing is applied to the temporally-bandpassed phase B(t).  Smoothing
+  the raw Δφ first lets broadband spatial noise contaminate B(t) before the
+  temporal filter can attenuate it.
+
+Reference: Wadhwa et al., Fig. 2 and Sect. 3.4.
 """
 
 from __future__ import annotations
@@ -23,6 +38,7 @@ import time
 from collections.abc import Generator, Iterable
 
 import torch
+import torch.nn.functional as F
 from loguru import logger
 from tqdm import tqdm
 
@@ -41,7 +57,8 @@ class PhaseMagnifier:
         n_scales: Number of pyramid scales.
         n_orientations: Number of orientation bands per scale.
         sigma: Spatial phase smoothing sigma (pixels, ``0`` = disabled).
-            Smoothing the phase before amplification reduces spatial noise.
+            Uses amplitude-weighted Gaussian blur (Eq. 17) so that low-amplitude
+            regions do not corrupt the phase of high-amplitude neighbours.
         filter_type: ``"ideal"`` (FFT) or ``"butterworth"`` (IIR).
         device: Compute device.
         dtype: Real tensor dtype (sub-band coefficients are complex).
@@ -80,22 +97,48 @@ class PhaseMagnifier:
             f"scales={n_scales}, orientations={n_orientations}, filter={filter_type}"
         )
 
-    def _smooth_phase(self, phase: torch.Tensor) -> torch.Tensor:
-        """Spatial Gaussian smoothing of a ``(H, W)`` or ``(T, H, W)`` phase map."""
+    def _smooth_phase(
+        self, phase: torch.Tensor, amplitude: torch.Tensor
+    ) -> torch.Tensor:
+        """Amplitude-weighted spatial Gaussian smoothing (Eq. 17, Wadhwa et al. 2013).
+
+        Computes:   (φ · A) ∗ K_σ  /  (A ∗ K_σ)
+
+        where K_σ is a Gaussian kernel.  Pixels with near-zero amplitude
+        contribute negligible weight, preventing their noisy phase values from
+        corrupting high-amplitude neighbours.
+
+        Args:
+            phase:     ``(H, W)`` or ``(T, H, W)`` real phase tensor.
+            amplitude: Same shape — local coefficient amplitude (``abs(coeff)``).
+
+        Returns:
+            Smoothed phase with the same shape.
+        """
         if self.sigma <= 0:
             return phase
+
         radius = int(3 * self.sigma)
         size = 2 * radius + 1
         coords = torch.arange(size, dtype=self.dtype, device=self.device) - radius
         g1d = torch.exp(-coords ** 2 / (2 * self.sigma ** 2))
         g1d = g1d / g1d.sum()
         kernel = torch.outer(g1d, g1d).unsqueeze(0).unsqueeze(0)  # (1,1,k,k)
+
         if phase.dim() == 2:
-            ph = phase.unsqueeze(0).unsqueeze(0)  # (1,1,H,W)
-            return torch.nn.functional.conv2d(ph, kernel, padding=radius).squeeze(0).squeeze(0)
-        else:  # (T, H, W) — treat T as batch dim for conv2d
-            ph = phase.unsqueeze(1)  # (T,1,H,W)
-            return torch.nn.functional.conv2d(ph, kernel, padding=radius).squeeze(1)  # (T,H,W)
+            ph = phase.unsqueeze(0).unsqueeze(0)      # (1,1,H,W)
+            am = amplitude.unsqueeze(0).unsqueeze(0)  # (1,1,H,W)
+        else:  # (T, H, W) or (N, H, W) — leading dim treated as batch
+            ph = phase.unsqueeze(1)      # (T,1,H,W)
+            am = amplitude.unsqueeze(1)  # (T,1,H,W)
+
+        numer = F.conv2d(ph * am, kernel, padding=radius)
+        denom = F.conv2d(am,      kernel, padding=radius).clamp(min=1e-8)
+        result = numer / denom
+
+        if phase.dim() == 2:
+            return result.squeeze(0).squeeze(0)
+        return result.squeeze(1)
 
     def process(self, frames: torch.Tensor, fps: float) -> torch.Tensor:
         """Run phase-based EVM on a video tensor.
@@ -125,16 +168,11 @@ class PhaseMagnifier:
             for scale in range(self.n_scales):
                 for orient in range(self.n_orientations):
                     coeffs = pyramid["subbands"][scale][orient]  # (T, H_s, W_s) complex
+                    amplitude = coeffs.abs()                      # (T, H_s, W_s)
+                    phase = torch.angle(coeffs)                   # (T, H_s, W_s)
+                    delta_phase = phase - phase[0:1]              # remove reference offset
 
-                    # Extract phase and remove DC (reference = first frame)
-                    phase = torch.angle(coeffs)       # (T, H_s, W_s) real
-                    delta_phase = phase - phase[0:1]
-
-                    # Spatial smoothing (batched over T)
-                    if self.sigma > 0:
-                        delta_phase = self._smooth_phase(delta_phase)
-
-                    # Temporal filter
+                    # Step 1: temporal filter — isolate motion frequency band
                     if self.filter_type == "ideal":
                         filt = IdealBandpass(fps, self.freq_low, self.freq_high)
                         filtered_phase = filt.apply(delta_phase)
@@ -142,10 +180,16 @@ class PhaseMagnifier:
                         filt_bw = ButterworthBandpass(fps, self.freq_low, self.freq_high)
                         filtered_phase = filt_bw.apply(delta_phase)
 
-                    # Amplify and write modified coefficients back
+                    # Step 2: amplitude-weighted spatial smoothing (Eq. 17)
+                    # Applied AFTER temporal filtering (Fig. 2 order) so that
+                    # broadband phase noise is attenuated before smoothing.
+                    if self.sigma > 0:
+                        filtered_phase = self._smooth_phase(filtered_phase, amplitude)
+
+                    # Step 3: amplify and shift coefficients
                     amp_phase = filtered_phase * self.factor
                     pyramid["subbands"][scale][orient] = torch.polar(
-                        coeffs.abs(), phase + amp_phase
+                        amplitude, phase + amp_phase
                     )
                     logger.debug(
                         f"Scale {scale}, orientation {orient}: "
@@ -174,13 +218,8 @@ class PhaseMagnifier:
         """Process frames in chunks, yielding each output frame.
 
         Buffers *chunk_size* frames, then runs the batched pyramid build and
-        collapse in one GPU call (much better utilisation than frame-by-frame).
-        The Butterworth IIR filter state carries across chunk boundaries via
-        its ``zi`` parameter, so the result is numerically identical to true
-        frame-by-frame streaming.
-
-        Memory scales with *chunk_size*, not total video length.  At 1080p
-        each chunk occupies roughly ``chunk_size × 165 MB`` of VRAM.
+        collapse in one GPU call.  The Butterworth IIR filter state carries
+        across chunk boundaries via its ``zi`` parameter.
 
         Uses Butterworth IIR regardless of *filter_type* (the ideal FFT filter
         requires all frames at once and cannot be used in streaming mode).
@@ -214,8 +253,9 @@ class PhaseMagnifier:
             t1 = time.perf_counter()
             for s in range(self.n_scales):
                 for o in range(self.n_orientations):
-                    coeffs = pyramid["subbands"][s][o]  # (N, H_s, W_s) complex
-                    phase  = torch.angle(coeffs)        # (N, H_s, W_s)
+                    coeffs    = pyramid["subbands"][s][o]  # (N, H_s, W_s) complex
+                    amplitude = coeffs.abs()               # (N, H_s, W_s)
+                    phase     = torch.angle(coeffs)        # (N, H_s, W_s)
 
                     key = (s, o)
                     if key not in ref_phase:
@@ -223,12 +263,13 @@ class PhaseMagnifier:
 
                     delta = phase - ref_phase[key]
 
-                    if self.sigma > 0:
-                        delta = self._smooth_phase(delta)
-
+                    # Temporal filter first, then amplitude-weighted spatial smooth
                     filtered = filters[key].apply_chunk(delta)
+                    if self.sigma > 0:
+                        filtered = self._smooth_phase(filtered, amplitude)
+
                     pyramid["subbands"][s][o] = torch.polar(
-                        coeffs.abs(), phase + filtered * self.factor
+                        amplitude, phase + filtered * self.factor
                     )
             t_filter = time.perf_counter() - t1
 
