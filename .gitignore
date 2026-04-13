@@ -5,9 +5,11 @@ build/
 dist/
 wheels/
 *.egg-info
+.ruff_cache
 
 # Virtual environments
 .venv
+.pixi
 
 # Pytest / coverage
 .pytest_cache/
@@ -29,4 +31,8 @@ htmlcov/
 *.avi
 *.mov
 *.mkv
+*.webm
 .claude/
+
+# Docs
+site/

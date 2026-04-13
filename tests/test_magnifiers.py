@@ -9,7 +9,7 @@ The tests validate:
 """
 
 import torch
-import pytest
+
 from pyevm.magnification.color import ColorMagnifier
 from pyevm.magnification.motion import MotionMagnifier
 from pyevm.magnification.phase import PhaseMagnifier
@@ -20,6 +20,7 @@ FPS = 30.0
 # ---------------------------------------------------------------------------
 # ColorMagnifier
 # ---------------------------------------------------------------------------
+
 
 class TestColorMagnifier:
     def test_output_shape(self, small_video):
@@ -42,10 +43,12 @@ class TestColorMagnifier:
         assert torch.allclose(out1, out2)
 
     def test_butterworth_filter(self, small_video):
-        mag = ColorMagnifier(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3, filter_type="butterworth")
+        mag = ColorMagnifier(
+            alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3, filter_type="butterworth"
+        )
         out = mag.process(small_video, FPS)
         assert out.shape == small_video.shape
-        assert 0.0 <= out.min().item() and out.max().item() <= 1.0
+        assert out.min().item() >= 0.0 and out.max().item() <= 1.0
 
     def test_zero_alpha_unchanged(self, small_video):
         """With alpha=0 and chrom_attenuation=0, output should equal input."""
@@ -57,8 +60,9 @@ class TestColorMagnifier:
             chrom_attenuation=0.0,
         )
         out = mag.process(small_video, FPS)
-        assert torch.allclose(out, small_video.clamp(0, 1), atol=1e-4), \
+        assert torch.allclose(out, small_video.clamp(0, 1), atol=1e-4), (
             f"Max diff: {(out - small_video).abs().max().item()}"
+        )
 
     def test_output_dtype(self, small_video):
         mag = ColorMagnifier(n_levels=3)
@@ -69,6 +73,7 @@ class TestColorMagnifier:
 # ---------------------------------------------------------------------------
 # MotionMagnifier
 # ---------------------------------------------------------------------------
+
 
 class TestMotionMagnifier:
     def test_output_shape(self, small_video):
@@ -91,7 +96,9 @@ class TestMotionMagnifier:
         assert torch.allclose(out1, out2)
 
     def test_ideal_filter(self, small_video):
-        mag = MotionMagnifier(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3, filter_type="ideal")
+        mag = MotionMagnifier(
+            alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3, filter_type="ideal"
+        )
         out = mag.process(small_video, FPS)
         assert out.shape == small_video.shape
 
@@ -115,6 +122,7 @@ class TestMotionMagnifier:
 # PhaseMagnifier
 # ---------------------------------------------------------------------------
 
+
 class TestPhaseMagnifier:
     def test_output_shape(self, small_video):
         mag = PhaseMagnifier(factor=2.0, freq_low=0.5, freq_high=3.0, n_scales=2, n_orientations=4)
@@ -134,15 +142,21 @@ class TestPhaseMagnifier:
 
     def test_butterworth_filter(self, small_video):
         mag = PhaseMagnifier(
-            factor=2.0, freq_low=0.5, freq_high=3.0,
-            n_scales=2, n_orientations=4, filter_type="butterworth"
+            factor=2.0,
+            freq_low=0.5,
+            freq_high=3.0,
+            n_scales=2,
+            n_orientations=4,
+            filter_type="butterworth",
         )
         out = mag.process(small_video, FPS)
         assert out.shape == small_video.shape
 
     def test_sigma_zero_no_smoothing(self, small_video):
         """sigma=0 should disable spatial smoothing without errors."""
-        mag = PhaseMagnifier(factor=2.0, freq_low=0.5, freq_high=3.0, n_scales=2, n_orientations=4, sigma=0.0)
+        mag = PhaseMagnifier(
+            factor=2.0, freq_low=0.5, freq_high=3.0, n_scales=2, n_orientations=4, sigma=0.0
+        )
         out = mag.process(small_video, FPS)
         assert out.shape == small_video.shape
 

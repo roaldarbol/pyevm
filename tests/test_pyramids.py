@@ -1,15 +1,15 @@
 """Tests for Gaussian, Laplacian, and steerable pyramid implementations."""
 
 import torch
-import pytest
+
 from pyevm.pyramids.gaussian import GaussianPyramid
 from pyevm.pyramids.laplacian import LaplacianPyramid
 from pyevm.pyramids.steerable import SteerablePyramid
 
-
 # ---------------------------------------------------------------------------
 # Gaussian pyramid
 # ---------------------------------------------------------------------------
+
 
 class TestGaussianPyramid:
     def test_level_count(self, small_frame):
@@ -35,7 +35,10 @@ class TestGaussianPyramid:
         pyr = GaussianPyramid(n_levels=4)
         levels = pyr.build(small_frame)
         result = pyr.collapse(levels)
-        assert result.shape == small_frame.unsqueeze(0).shape or result.shape[2:] == small_frame.shape[2:]
+        assert (
+            result.shape == small_frame.unsqueeze(0).shape
+            or result.shape[2:] == small_frame.shape[2:]
+        )
 
     def test_accepts_3d_input(self, cpu_device):
         pyr = GaussianPyramid(n_levels=3)
@@ -56,6 +59,7 @@ class TestGaussianPyramid:
 # Laplacian pyramid
 # ---------------------------------------------------------------------------
 
+
 class TestLaplacianPyramid:
     def test_level_count(self, small_frame):
         pyr = LaplacianPyramid(n_levels=4)
@@ -68,8 +72,9 @@ class TestLaplacianPyramid:
         levels = pyr.build(small_frame)
         reconstructed = pyr.collapse(levels)
         original = small_frame.unsqueeze(0) if small_frame.dim() == 3 else small_frame
-        assert torch.allclose(reconstructed, original, atol=1e-4), \
+        assert torch.allclose(reconstructed, original, atol=1e-4), (
             f"Max abs diff: {(reconstructed - original).abs().max().item()}"
+        )
 
     def test_detail_levels_near_zero_mean(self, small_frame):
         """Laplacian detail bands should have near-zero mean (band-pass property)."""
@@ -99,6 +104,7 @@ class TestLaplacianPyramid:
 # ---------------------------------------------------------------------------
 # Steerable pyramid
 # ---------------------------------------------------------------------------
+
 
 class TestSteerablePyramid:
     def test_build_returns_expected_keys(self, luma_frame):

@@ -1,0 +1,71 @@
+[project]
+site_name = "pyevm"
+site_url = "https://roaldarbol.github.io/pyevm"
+site_description = "Eulerian Video Magnification — reveal invisible motion and colour changes in video"
+site_author = "Mikkel Roald-Arbol"
+repo_url = "https://github.com/roaldarbol/pyevm"
+repo_name = "roaldarbol/pyevm"
+docs_dir = "docs"
+site_dir = "site"
+
+nav = [
+  { Home = "index.md" },
+  { Installation = "installation.md" },
+  { Usage = "usage.md" },
+  { "API Reference" = "api.md" },
+  { "CLI Reference" = "cli.md" },
+  { Changelog = "changelog.md" },
+]
+
+# ---------------------------------------------------------------------------
+# Theme
+# ---------------------------------------------------------------------------
+
+[project.theme]
+logo = "assets/logo.png"
+favicon = "assets/logo.png"
+features = [
+  "navigation.instant",
+  "navigation.sections",
+  "navigation.top",
+  "content.code.copy",
+  "content.code.annotate",
+  "search.highlight",
+]
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: light)"
+scheme = "default"
+primary = "indigo"
+accent = "indigo"
+
+  [project.theme.palette.toggle]
+  icon = "material/brightness-7"
+  name = "Switch to dark mode"
+
+[[project.theme.palette]]
+media = "(prefers-color-scheme: dark)"
+scheme = "slate"
+primary = "indigo"
+accent = "indigo"
+
+  [project.theme.palette.toggle]
+  icon = "material/brightness-4"
+  name = "Switch to light mode"
+
+# ---------------------------------------------------------------------------
+# Plugins
+# ---------------------------------------------------------------------------
+
+[project.plugins.search]
+
+[project.plugins.mkdocstrings.handlers.python]
+paths = ["src"]
+
+[project.plugins.mkdocstrings.handlers.python.options]
+docstring_style = "google"
+show_source = true
+show_root_heading = true
+show_symbol_type_heading = true
+show_symbol_type_toc = true
+members_order = "source"

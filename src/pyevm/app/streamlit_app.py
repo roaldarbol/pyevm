@@ -42,16 +42,17 @@ st.set_page_config(
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 @st.cache_resource
 def _detect_device() -> torch.device:
     return get_device()
 
 
 def _bytes_to_temp_file(data: bytes, suffix: str) -> Path:
-    tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
-    tmp.write(data)
-    tmp.flush()
-    return Path(tmp.name)
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp.write(data)
+        tmp.flush()
+        return Path(tmp.name)
 
 
 def _read_video(path: Path, device: torch.device, max_frames: int | None):
@@ -75,6 +76,7 @@ def _write_video_to_bytes(frames: torch.Tensor, fps: float) -> bytes:
 # UI helpers
 # ---------------------------------------------------------------------------
 
+
 def _sidebar_device(device: torch.device) -> None:
     st.sidebar.markdown("### Compute Device")
     if device.type == "cuda":
@@ -90,8 +92,12 @@ def _color_params() -> dict:
     st.sidebar.markdown("### Algorithm Parameters")
     return {
         "alpha": st.sidebar.slider("Alpha (amplification)", 5.0, 200.0, 50.0, step=5.0),
-        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"),
-        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"),
+        "freq_low": st.sidebar.number_input(
+            "Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"
+        ),
+        "freq_high": st.sidebar.number_input(
+            "Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"
+        ),
         "n_levels": st.sidebar.slider("Pyramid levels", 2, 8, 6),
         "chrom_attenuation": st.sidebar.slider("Chrominance attenuation", 0.0, 1.0, 0.1, step=0.05),
         "filter_type": st.sidebar.selectbox("Filter type", ["ideal", "butterworth"]),
@@ -102,8 +108,12 @@ def _motion_params() -> dict:
     st.sidebar.markdown("### Algorithm Parameters")
     return {
         "alpha": st.sidebar.slider("Alpha (amplification)", 1.0, 100.0, 20.0, step=1.0),
-        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"),
-        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"),
+        "freq_low": st.sidebar.number_input(
+            "Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"
+        ),
+        "freq_high": st.sidebar.number_input(
+            "Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"
+        ),
         "n_levels": st.sidebar.slider("Pyramid levels", 2, 8, 6),
         "lambda_c": st.sidebar.slider("Lambda c (spatial cutoff, px)", 4.0, 64.0, 16.0, step=2.0),
         "filter_type": st.sidebar.selectbox("Filter type", ["butterworth", "ideal"]),
@@ -111,21 +121,47 @@ def _motion_params() -> dict:
 
 
 def _phase_params() -> dict:
+    import math as _math
+
     st.sidebar.markdown("### Algorithm Parameters")
-    return {
+    params: dict = {
         "factor": st.sidebar.slider("Factor (phase amplification)", 1.0, 100.0, 10.0, step=1.0),
-        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"),
-        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"),
+        "freq_low": st.sidebar.number_input(
+            "Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"
+        ),
+        "freq_high": st.sidebar.number_input(
+            "Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"
+        ),
         "n_scales": st.sidebar.slider("Pyramid scales", 2, 8, 6),
         "n_orientations": st.sidebar.slider("Orientations per scale", 2, 8, 8),
-        "sigma": st.sidebar.slider("Phase smoothing sigma (0 = off)", 0.0, 10.0, 3.0, step=0.5),
+        "sigma": st.sidebar.slider("Phase smoothing sigma (0 = off)", 0.0, 10.0, 0.0, step=0.5),
         "filter_type": st.sidebar.selectbox("Filter type", ["ideal", "butterworth"]),
     }
+    st.sidebar.markdown("### Large-Motion Attenuation")
+    params["attenuate_motion"] = st.sidebar.checkbox(
+        "Attenuate large motions (Fig. 11)",
+        value=False,
+        help="Wrap amplified phase changes larger than the threshold back to zero, "
+        "suppressing camera shake or other large global motions while keeping "
+        "subtle local vibrations.",
+    )
+    if params["attenuate_motion"]:
+        params["attenuate_mag"] = st.sidebar.slider(
+            "Attenuation threshold (rad)",
+            0.1,
+            _math.pi * 2,
+            _math.pi,
+            step=0.05,
+            help="Amplified phase changes above this value are attenuated. "
+            "π (≈ 3.14) is the default and largest unambiguous phase step.",
+        )
+    return params
 
 
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     device = _detect_device()
@@ -157,6 +193,35 @@ def main() -> None:
         params = _motion_params()
     else:
         params = _phase_params()
+
+    # --- Notch filter (shared across all algorithms) ---
+    st.sidebar.markdown("### Notch Filters")
+    notch_input = st.sidebar.text_input(
+        "Notch frequencies (Hz)",
+        value="",
+        placeholder="e.g. 50, 60",
+        help="Comma-separated list of frequencies to suppress. "
+        "Useful for removing 50/60 Hz light flicker.",
+    )
+    notch_freqs: list[float] = []
+    for tok in notch_input.split(","):
+        tok = tok.strip()
+        if tok:
+            try:
+                notch_freqs.append(float(tok))
+            except ValueError:
+                st.sidebar.warning(f"Ignoring invalid notch frequency: '{tok}'")
+    if notch_freqs:
+        notch_width = st.sidebar.slider(
+            "Notch width (Hz)",
+            0.1,
+            5.0,
+            1.0,
+            step=0.1,
+            help="Bandwidth of each notch. Wider removes more signal around the target frequency.",
+        )
+        params["notch_freqs"] = notch_freqs
+        params["notch_width"] = notch_width
 
     # --- Upload ---
     st.markdown("## 1. Upload Video")

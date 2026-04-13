@@ -5,12 +5,12 @@
 # Windows CUDA builds.
 #
 # Install pixi:  https://pixi.sh
-# Setup:         pixi install
+# Setup:         pixi install && pixi run lefthook install
 # Run CLI:       pixi run pyevm phase input.mp4 output.mp4
 # Run tests:     pixi run test
 
 [workspace]
-name      = "pyevm"
+name      = "pyeulervid"
 version   = "0.1.0"
 channels  = ["conda-forge"]
 platforms = ["win-64", "linux-64", "osx-64"]
@@ -48,13 +48,32 @@ torchcodec = { version = "0.10.*" }  # CPU-only build
 [pypi-dependencies]
 # Install the project itself in editable mode.
 # torch is already satisfied by the conda pytorch package above, so pip
-# will skip it when resolving pyevm's dependencies.
-pyevm = { path = ".", editable = true, extras = ["dev"] }
+# will skip it when resolving pyeulervid's dependencies.
+pyeulervid = { path = ".", editable = true, extras = ["dev", "docs"] }
 
 # ---------------------------------------------------------------------------
 # Tasks
 # ---------------------------------------------------------------------------
 
 [tasks]
-test  = "python -m pytest"
-pyevm = "python -m pyevm.cli"
+# Testing
+test         = "python -m pytest"
+test-cov     = "python -m pytest --cov=pyevm --cov-report=term-missing --cov-report=xml"
+
+# Linting / formatting
+lint         = "ruff check src tests"
+format       = "ruff format src tests"
+lint-fix     = "ruff check --fix src tests"
+
+# Git hooks
+lefthook     = "lefthook"
+
+# Security
+audit        = "pip-audit"
+
+# Docs
+docs         = "zensical build"
+docs-serve   = "zensical serve"
+
+# CLI shortcut
+pyevm        = "python -m pyevm.cli"

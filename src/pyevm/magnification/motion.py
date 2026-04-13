@@ -15,7 +15,6 @@ This algorithm is best for subtle *motion* (e.g. vibrations, breathing).
 
 from __future__ import annotations
 
-import math
 import time
 from collections.abc import Generator, Iterable
 
@@ -51,6 +50,8 @@ class MotionMagnifier:
         n_levels: int = 6,
         lambda_c: float = 16.0,
         filter_type: str = "butterworth",
+        notch_freqs: list[float] | None = None,
+        notch_width: float = 1.0,
         device: torch.device | None = None,
         dtype: torch.dtype = torch.float32,
     ) -> None:
@@ -60,6 +61,8 @@ class MotionMagnifier:
         self.n_levels = n_levels
         self.lambda_c = lambda_c
         self.filter_type = filter_type
+        self.notch_freqs = notch_freqs or []
+        self.notch_width = notch_width
         self.device = device or torch.device("cpu")
         self.dtype = dtype
 
@@ -121,10 +124,22 @@ class MotionMagnifier:
             logger.debug(f"Level {lvl}: shape {tuple(level_tensor.shape)}")
 
             if self.filter_type == "ideal":
-                filt = IdealBandpass(fps, self.freq_low, self.freq_high)
+                filt = IdealBandpass(
+                    fps,
+                    self.freq_low,
+                    self.freq_high,
+                    notch_freqs=self.notch_freqs,
+                    notch_width=self.notch_width,
+                )
                 filtered = filt.apply(level_tensor)
             else:
-                filt = ButterworthBandpass(fps, self.freq_low, self.freq_high)
+                filt = ButterworthBandpass(
+                    fps,
+                    self.freq_low,
+                    self.freq_high,
+                    notch_freqs=self.notch_freqs,
+                    notch_width=self.notch_width,
+                )
                 filtered = filt.apply(level_tensor)
 
             alpha_eff = self._alpha_for_level(lvl)
@@ -176,7 +191,13 @@ class MotionMagnifier:
         """
         # One filter per pyramid level; state carries across chunk boundaries
         filters = [
-            ButterworthBandpass(fps, self.freq_low, self.freq_high)
+            ButterworthBandpass(
+                fps,
+                self.freq_low,
+                self.freq_high,
+                notch_freqs=self.notch_freqs,
+                notch_width=self.notch_width,
+            )
             for _ in range(self.n_levels)
         ]
         # Precompute per-level alpha
@@ -184,41 +205,39 @@ class MotionMagnifier:
 
         def _process_chunk(chunk: list[torch.Tensor]) -> Generator[torch.Tensor, None, None]:
             N = len(chunk)
-            batch = torch.stack(chunk)      # (N, C, H, W)
+            batch = torch.stack(chunk)  # (N, C, H, W)
 
             t0 = time.perf_counter()
-            yiq   = rgb_to_yiq(batch)       # (N, 3, H, W)
-            levels = self._pyramid.build(yiq)   # list of n_levels × (N, 3, h_l, w_l)
+            yiq = rgb_to_yiq(batch)  # (N, 3, H, W)
+            levels = self._pyramid.build(yiq)  # list of n_levels × (N, 3, h_l, w_l)
             t_build = time.perf_counter() - t0
 
             t_filter_lvl: list[float] = []
             modified_levels = []
             for lvl in range(self.n_levels):
-                level_t = levels[lvl]                               # (N, 3, h_l, w_l)
+                level_t = levels[lvl]  # (N, 3, h_l, w_l)
                 if alphas[lvl] == 0.0:
                     # Skip IIR call entirely; still advance state so timing is consistent
                     modified_levels.append(level_t)
                     t_filter_lvl.append(0.0)
                 else:
                     tf = time.perf_counter()
-                    filtered = filters[lvl].apply_chunk(level_t)    # (N, 3, h_l, w_l)
+                    filtered = filters[lvl].apply_chunk(level_t)  # (N, 3, h_l, w_l)
                     t_filter_lvl.append(time.perf_counter() - tf)
                     modified_levels.append(level_t + filtered * alphas[lvl])
 
             t1 = time.perf_counter()
-            result_yiq = self._pyramid.collapse(modified_levels)    # (N, 3, H, W)
-            result_rgb = yiq_to_rgb(result_yiq).clamp(0.0, 1.0)    # (N, C, H, W)
+            result_yiq = self._pyramid.collapse(modified_levels)  # (N, 3, H, W)
+            result_rgb = yiq_to_rgb(result_yiq).clamp(0.0, 1.0)  # (N, C, H, W)
             t_collapse = time.perf_counter() - t1
 
             total_filter = sum(t_filter_lvl)
-            per_lvl = "  ".join(
-                f"L{i}={ms*1000:.1f}ms" for i, ms in enumerate(t_filter_lvl)
-            )
+            per_lvl = "  ".join(f"L{i}={ms * 1000:.1f}ms" for i, ms in enumerate(t_filter_lvl))
             logger.debug(
                 f"  [motion chunk N={N}]  "
-                f"build={t_build*1000:.1f}ms  "
-                f"filter_total={total_filter*1000:.1f}ms ({per_lvl})  "
-                f"collapse={t_collapse*1000:.1f}ms"
+                f"build={t_build * 1000:.1f}ms  "
+                f"filter_total={total_filter * 1000:.1f}ms ({per_lvl})  "
+                f"collapse={t_collapse * 1000:.1f}ms"
             )
             yield from result_rgb
 
@@ -232,7 +251,9 @@ class MotionMagnifier:
                         yield out_frame
                         bar.update(1)
                     elapsed = time.perf_counter() - t0
-                    logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")
+                    logger.debug(
+                        f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk) / elapsed:.1f} fps)"
+                    )
                     chunk = []
             if chunk:
                 t0 = time.perf_counter()
@@ -240,4 +261,6 @@ class MotionMagnifier:
                     yield out_frame
                     bar.update(1)
                 elapsed = time.perf_counter() - t0
-                logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")
+                logger.debug(
+                    f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk) / elapsed:.1f} fps)"
+                )

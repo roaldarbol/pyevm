@@ -9,9 +9,7 @@ from loguru import logger
 
 def _gaussian_kernel(device: torch.device, dtype: torch.dtype) -> torch.Tensor:
     """5×5 Gaussian blur kernel matching the reference MATLAB implementation."""
-    k = torch.tensor(
-        [1, 4, 6, 4, 1], dtype=dtype, device=device
-    )
+    k = torch.tensor([1, 4, 6, 4, 1], dtype=dtype, device=device)
     k = torch.outer(k, k)
     k = k / k.sum()
     # Shape: (1, 1, 5, 5) — applied per-channel via groups
@@ -35,7 +33,9 @@ def _blur_downsample(x: torch.Tensor, kernel: torch.Tensor) -> torch.Tensor:
     return x[:, :, ::2, ::2]
 
 
-def _upsample_blur(x: torch.Tensor, kernel: torch.Tensor, target_h: int, target_w: int) -> torch.Tensor:
+def _upsample_blur(
+    x: torch.Tensor, kernel: torch.Tensor, target_h: int, target_w: int
+) -> torch.Tensor:
     """Upsample by 2 then blur.
 
     Args:

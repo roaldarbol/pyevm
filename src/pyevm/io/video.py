@@ -26,10 +26,10 @@ import torch
 from loguru import logger
 from tqdm import tqdm
 
-
 # ---------------------------------------------------------------------------
 # Reader
 # ---------------------------------------------------------------------------
+
 
 class VideoReader:
     """Read a video file into a tensor.
@@ -62,7 +62,7 @@ class VideoReader:
     def _read_metadata(self) -> dict:
         cap = cv2.VideoCapture(str(self.path))
         if not cap.isOpened():
-            raise IOError(f"Cannot open video: {self.path}")
+            raise OSError(f"Cannot open video: {self.path}")
         fps = cap.get(cv2.CAP_PROP_FPS)
         n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -107,18 +107,28 @@ class VideoReader:
 
     def _read_torchcodec(self) -> tuple[torch.Tensor, float]:
         from torchcodec.decoders import VideoDecoder  # noqa: PLC0415
-        meta    = self.metadata
-        fps     = meta["fps"]
-        limit   = min(self.max_frames, meta["n_frames"]) if self.max_frames is not None else meta["n_frames"]
+
+        meta = self.metadata
+        fps = meta["fps"]
+        limit = (
+            min(self.max_frames, meta["n_frames"])
+            if self.max_frames is not None
+            else meta["n_frames"]
+        )
         decoder = VideoDecoder(str(self.path), device=str(self.device))
         # Slice returns (T, C, H, W) uint8 tensor already on self.device
-        frames  = decoder[0:limit].float() * (1.0 / 255.0)
+        frames = decoder[0:limit].float() * (1.0 / 255.0)
         return frames, fps
 
     def _stream_torchcodec(self) -> Generator[torch.Tensor, None, None]:
         from torchcodec.decoders import VideoDecoder  # noqa: PLC0415
-        meta    = self.metadata
-        limit   = min(self.max_frames, meta["n_frames"]) if self.max_frames is not None else meta["n_frames"]
+
+        meta = self.metadata
+        limit = (
+            min(self.max_frames, meta["n_frames"])
+            if self.max_frames is not None
+            else meta["n_frames"]
+        )
         decoder = VideoDecoder(str(self.path), device=str(self.device))
         with tqdm(total=limit, desc="   Reading", unit="frame", position=2, leave=True) as bar:
             for i in range(limit):
@@ -127,11 +137,15 @@ class VideoReader:
                 bar.update(1)
 
     def _stream_opencv(self) -> Generator[torch.Tensor, None, None]:
-        meta  = self.metadata
-        limit = min(self.max_frames, meta["n_frames"]) if self.max_frames is not None else meta["n_frames"]
+        meta = self.metadata
+        limit = (
+            min(self.max_frames, meta["n_frames"])
+            if self.max_frames is not None
+            else meta["n_frames"]
+        )
         cap = cv2.VideoCapture(str(self.path))
         if not cap.isOpened():
-            raise IOError(f"Cannot open video: {self.path}")
+            raise OSError(f"Cannot open video: {self.path}")
         count = 0
         try:
             with tqdm(total=limit, desc="   Reading", unit="frame", position=2, leave=True) as bar:
@@ -140,9 +154,11 @@ class VideoReader:
                     if not ret:
                         break
                     frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    yield torch.from_numpy(
-                        frame_rgb.astype(np.float32) * (1.0 / 255.0)
-                    ).permute(2, 0, 1).to(self.device)
+                    yield (
+                        torch.from_numpy(frame_rgb.astype(np.float32) * (1.0 / 255.0))
+                        .permute(2, 0, 1)
+                        .to(self.device)
+                    )
                     count += 1
                     bar.update(1)
         finally:
@@ -154,12 +170,12 @@ class VideoReader:
     def _read_opencv(self) -> tuple[torch.Tensor, float]:
         cap = cv2.VideoCapture(str(self.path))
         if not cap.isOpened():
-            raise IOError(f"Cannot open video: {self.path}")
-        fps    = cap.get(cv2.CAP_PROP_FPS)
-        total  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            raise OSError(f"Cannot open video: {self.path}")
+        fps = cap.get(cv2.CAP_PROP_FPS)
+        total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        limit  = min(self.max_frames, total) if self.max_frames is not None else total
+        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        limit = min(self.max_frames, total) if self.max_frames is not None else total
 
         # Pre-allocate the full output tensor so we never hold a separate list of
         # uint8 arrays AND a float32 copy at the same time.  Each frame is decoded
@@ -189,6 +205,7 @@ class VideoReader:
 # ---------------------------------------------------------------------------
 # Writer
 # ---------------------------------------------------------------------------
+
 
 class VideoWriter:
     """Write a tensor to a video file.
@@ -264,22 +281,35 @@ class VideoWriter:
     ) -> None:
         """Open an FFmpeg pipe and feed frames one at a time."""
         cmd = [
-            "ffmpeg", "-y",
-            "-f", "rawvideo", "-vcodec", "rawvideo",
-            "-pix_fmt", "rgb24",
-            "-s", f"{W}x{H}",
-            "-r", str(self.fps),
-            "-i", "pipe:0",
-            "-vcodec", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-crf", "18",
+            "ffmpeg",
+            "-y",
+            "-f",
+            "rawvideo",
+            "-vcodec",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{W}x{H}",
+            "-r",
+            str(self.fps),
+            "-i",
+            "pipe:0",
+            "-vcodec",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-crf",
+            "18",
             str(self.path),
         ]
         logger.debug(f"VideoWriter stream: FFmpeg command: {' '.join(cmd)}")
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         count = 0
         try:
-            with tqdm(total=n_frames, desc="  Writing", unit="frame", position=0, leave=True) as bar:
+            with tqdm(
+                total=n_frames, desc="  Writing", unit="frame", position=0, leave=True
+            ) as bar:
                 for frame in frames:
                     frame_u8 = (frame.cpu().clamp(0, 1) * 255).byte()
                     frame_np = frame_u8.permute(1, 2, 0).numpy()
@@ -306,7 +336,7 @@ class VideoWriter:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(self.path), fourcc, self.fps, (W, H))
         if not writer.isOpened():
-            raise IOError(f"Cannot open VideoWriter for {self.path}")
+            raise OSError(f"Cannot open VideoWriter for {self.path}")
         count = 0
         with tqdm(total=n_frames, desc="  Writing", unit="frame", position=0, leave=True) as bar:
             for frame in frames:
@@ -326,23 +356,35 @@ class VideoWriter:
 
         # Try hardware-accelerated encoder; fall back to libx264
         cmd = [
-            "ffmpeg", "-y",
-            "-f", "rawvideo",
-            "-vcodec", "rawvideo",
-            "-pix_fmt", "rgb24",
-            "-s", f"{W}x{H}",
-            "-r", str(self.fps),
-            "-i", "pipe:0",
-            "-vcodec", "libx264",
-            "-pix_fmt", "yuv420p",
-            "-crf", "18",
+            "ffmpeg",
+            "-y",
+            "-f",
+            "rawvideo",
+            "-vcodec",
+            "rawvideo",
+            "-pix_fmt",
+            "rgb24",
+            "-s",
+            f"{W}x{H}",
+            "-r",
+            str(self.fps),
+            "-i",
+            "pipe:0",
+            "-vcodec",
+            "libx264",
+            "-pix_fmt",
+            "yuv420p",
+            "-crf",
+            "18",
             str(self.path),
         ]
         logger.debug(f"FFmpeg command: {' '.join(cmd)}")
 
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         try:
-            with tqdm(total=frames_u8.shape[0], desc="  Writing", unit="frame", position=0, leave=True) as bar:
+            with tqdm(
+                total=frames_u8.shape[0], desc="  Writing", unit="frame", position=0, leave=True
+            ) as bar:
                 for t in range(frames_u8.shape[0]):
                     frame_np = frames_u8[t].permute(1, 2, 0).numpy()
                     proc.stdin.write(frame_np.tobytes())  # type: ignore[union-attr]
@@ -363,8 +405,10 @@ class VideoWriter:
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(self.path), fourcc, self.fps, (W, H))
         if not writer.isOpened():
-            raise IOError(f"Cannot open VideoWriter for {self.path}")
-        with tqdm(total=frames_u8.shape[0], desc="  Writing", unit="frame", position=0, leave=True) as bar:
+            raise OSError(f"Cannot open VideoWriter for {self.path}")
+        with tqdm(
+            total=frames_u8.shape[0], desc="  Writing", unit="frame", position=0, leave=True
+        ) as bar:
             for t in range(frames_u8.shape[0]):
                 frame_np = frames_u8[t].permute(1, 2, 0).numpy()  # (H, W, C) RGB
                 frame_bgr = cv2.cvtColor(frame_np, cv2.COLOR_RGB2BGR)

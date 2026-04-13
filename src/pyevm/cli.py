@@ -24,9 +24,10 @@ Add ``--debug`` to any command for verbose logging.
 
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated
 
 import typer
 from loguru import logger
@@ -47,7 +48,7 @@ _DebugOption = Annotated[
 ]
 
 _DeviceOption = Annotated[
-    Optional[str],
+    str | None,
     typer.Option(
         "--device",
         help="Compute device: 'cuda', 'mps', or 'cpu'. Auto-detected when omitted.",
@@ -68,29 +69,30 @@ def _setup_logging(debug: bool) -> None:
         logger.debug("Debug logging enabled")
 
 
-def _get_device(device_str: str | None) -> "torch.device":  # noqa: F821
+def _get_device(device_str: str | None) -> torch.device:  # noqa: F821
     import torch  # noqa: PLC0415
+
     from pyevm.device import get_device  # noqa: PLC0415
+
     if device_str is not None:
         return torch.device(device_str)
     return get_device()
 
 
-def _load_video(input_path: Path, device: "torch.device", max_frames: int | None):  # noqa: F821
+def _load_video(input_path: Path, device: torch.device, max_frames: int | None):  # noqa: F821
     from pyevm.io.video import VideoReader  # noqa: PLC0415
+
     reader = VideoReader(input_path, device=device, max_frames=max_frames)
     logger.info(f"Loading video: {input_path}")
     frames, fps = reader.read()
     meta = reader.metadata
-    logger.info(
-        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
-        f"{meta['width']}×{meta['height']} px"
-    )
+    logger.info(f"  {meta['n_frames']} frames, {fps:.2f} fps, {meta['width']}×{meta['height']} px")
     return frames, fps
 
 
-def _save_video(frames: "torch.Tensor", output_path: Path, fps: float) -> None:  # noqa: F821
+def _save_video(frames: torch.Tensor, output_path: Path, fps: float) -> None:  # noqa: F821
     from pyevm.io.video import VideoWriter  # noqa: PLC0415
+
     writer = VideoWriter(output_path, fps=fps)
     logger.info(f"Saving result → {output_path}")
     writer.write(frames)
@@ -101,18 +103,41 @@ def _save_video(frames: "torch.Tensor", output_path: Path, fps: float) -> None: 
 # Commands
 # ---------------------------------------------------------------------------
 
+
 @app.command()
 def color(
     input: Annotated[Path, typer.Argument(help="Input video file.")],
     output: Annotated[Path, typer.Argument(help="Output video file.")],
     alpha: Annotated[float, typer.Option(help="Luminance amplification factor.")] = 50.0,
-    freq_low: Annotated[float, typer.Option("--freq-low", help="Lower bandpass frequency (Hz).")] = 0.4,
-    freq_high: Annotated[float, typer.Option("--freq-high", help="Upper bandpass frequency (Hz).")] = 3.0,
+    freq_low: Annotated[
+        float, typer.Option("--freq-low", help="Lower bandpass frequency (Hz).")
+    ] = 0.4,
+    freq_high: Annotated[
+        float, typer.Option("--freq-high", help="Upper bandpass frequency (Hz).")
+    ] = 3.0,
     n_levels: Annotated[int, typer.Option(help="Gaussian pyramid levels.")] = 6,
-    chrom_attenuation: Annotated[float, typer.Option("--chrom-attenuation", help="Chrominance attenuation (0–1).")] = 0.1,
-    pyramid_level: Annotated[Optional[int], typer.Option("--pyramid-level", help="Pyramid level to filter.")] = None,
-    filter_type: Annotated[str, typer.Option("--filter", help="'ideal' or 'butterworth'.")] = "ideal",
-    max_frames: Annotated[Optional[int], typer.Option("--max-frames", help="Limit frames read.")] = None,
+    chrom_attenuation: Annotated[
+        float, typer.Option("--chrom-attenuation", help="Chrominance attenuation (0–1).")
+    ] = 0.1,
+    pyramid_level: Annotated[
+        int | None, typer.Option("--pyramid-level", help="Pyramid level to filter.")
+    ] = None,
+    filter_type: Annotated[
+        str, typer.Option("--filter", help="'ideal' or 'butterworth'.")
+    ] = "ideal",
+    notch: Annotated[
+        list[float] | None,
+        typer.Option(
+            "--notch",
+            help="Frequency to notch out (Hz). Repeat for multiple, e.g. --notch 50 --notch 100.",
+        ),
+    ] = None,
+    notch_width: Annotated[
+        float, typer.Option("--notch-width", help="Width of each notch in Hz.")
+    ] = 1.0,
+    max_frames: Annotated[
+        int | None, typer.Option("--max-frames", help="Limit frames read.")
+    ] = None,
     chunk_size: Annotated[int, typer.Option("--chunk-size", help="Frames per GPU batch.")] = 64,
     device: _DeviceOption = None,
     debug: _DebugOption = False,
@@ -125,13 +150,10 @@ def color(
     dev = _get_device(device)
 
     reader = VideoReader(input, device=dev, max_frames=max_frames)
-    meta   = reader.metadata
-    fps    = meta["fps"]
+    meta = reader.metadata
+    fps = meta["fps"]
     logger.info(f"Loading video: {input}")
-    logger.info(
-        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
-        f"{meta['width']}×{meta['height']} px"
-    )
+    logger.info(f"  {meta['n_frames']} frames, {fps:.2f} fps, {meta['width']}×{meta['height']} px")
 
     magnifier = ColorMagnifier(
         alpha=alpha,
@@ -141,12 +163,16 @@ def color(
         chrom_attenuation=chrom_attenuation,
         pyramid_level=pyramid_level,
         filter_type=filter_type,
+        notch_freqs=notch,
+        notch_width=notch_width,
         device=dev,
     )
 
     n_out = min(max_frames, meta["n_frames"]) if max_frames is not None else meta["n_frames"]
-    frame_stream     = reader.stream()
-    processed_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_out, chunk_size=chunk_size)
+    frame_stream = reader.stream()
+    processed_stream = magnifier.process_stream(
+        frame_stream, fps, n_frames=n_out, chunk_size=chunk_size
+    )
 
     logger.info(f"Saving result → {output}")
     writer = VideoWriter(output, fps=fps)
@@ -164,12 +190,29 @@ def motion(
     input: Annotated[Path, typer.Argument(help="Input video file.")],
     output: Annotated[Path, typer.Argument(help="Output video file.")],
     alpha: Annotated[float, typer.Option(help="Nominal amplification factor.")] = 20.0,
-    freq_low: Annotated[float, typer.Option("--freq-low", help="Lower bandpass frequency (Hz).")] = 0.4,
-    freq_high: Annotated[float, typer.Option("--freq-high", help="Upper bandpass frequency (Hz).")] = 3.0,
+    freq_low: Annotated[
+        float, typer.Option("--freq-low", help="Lower bandpass frequency (Hz).")
+    ] = 0.4,
+    freq_high: Annotated[
+        float, typer.Option("--freq-high", help="Upper bandpass frequency (Hz).")
+    ] = 3.0,
     n_levels: Annotated[int, typer.Option(help="Laplacian pyramid levels.")] = 6,
-    lambda_c: Annotated[float, typer.Option("--lambda-c", help="Spatial wavelength cutoff (px).")] = 16.0,
-    filter_type: Annotated[str, typer.Option("--filter", help="'butterworth' or 'ideal'.")] = "butterworth",
-    max_frames: Annotated[Optional[int], typer.Option("--max-frames", help="Limit frames read.")] = None,
+    lambda_c: Annotated[
+        float, typer.Option("--lambda-c", help="Spatial wavelength cutoff (px).")
+    ] = 16.0,
+    filter_type: Annotated[
+        str, typer.Option("--filter", help="'butterworth' or 'ideal'.")
+    ] = "butterworth",
+    notch: Annotated[
+        list[float] | None,
+        typer.Option("--notch", help="Frequency to notch out (Hz). Repeat for multiple."),
+    ] = None,
+    notch_width: Annotated[
+        float, typer.Option("--notch-width", help="Width of each notch in Hz.")
+    ] = 1.0,
+    max_frames: Annotated[
+        int | None, typer.Option("--max-frames", help="Limit frames read.")
+    ] = None,
     chunk_size: Annotated[int, typer.Option("--chunk-size", help="Frames per GPU batch.")] = 64,
     device: _DeviceOption = None,
     debug: _DebugOption = False,
@@ -182,13 +225,10 @@ def motion(
     dev = _get_device(device)
 
     reader = VideoReader(input, device=dev, max_frames=max_frames)
-    meta   = reader.metadata
-    fps    = meta["fps"]
+    meta = reader.metadata
+    fps = meta["fps"]
     logger.info(f"Loading video: {input}")
-    logger.info(
-        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
-        f"{meta['width']}×{meta['height']} px"
-    )
+    logger.info(f"  {meta['n_frames']} frames, {fps:.2f} fps, {meta['width']}×{meta['height']} px")
 
     magnifier = MotionMagnifier(
         alpha=alpha,
@@ -197,12 +237,16 @@ def motion(
         n_levels=n_levels,
         lambda_c=lambda_c,
         filter_type=filter_type,
+        notch_freqs=notch,
+        notch_width=notch_width,
         device=dev,
     )
 
     n_out = min(max_frames, meta["n_frames"]) if max_frames is not None else meta["n_frames"]
-    frame_stream     = reader.stream()
-    processed_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_out, chunk_size=chunk_size)
+    frame_stream = reader.stream()
+    processed_stream = magnifier.process_stream(
+        frame_stream, fps, n_frames=n_out, chunk_size=chunk_size
+    )
 
     logger.info(f"Saving result → {output}")
     writer = VideoWriter(output, fps=fps)
@@ -220,14 +264,46 @@ def phase(
     input: Annotated[Path, typer.Argument(help="Input video file.")],
     output: Annotated[Path, typer.Argument(help="Output video file.")],
     factor: Annotated[float, typer.Option(help="Phase amplification factor.")] = 10.0,
-    freq_low: Annotated[float, typer.Option("--freq-low", help="Lower bandpass frequency (Hz).")] = 0.4,
-    freq_high: Annotated[float, typer.Option("--freq-high", help="Upper bandpass frequency (Hz).")] = 3.0,
+    freq_low: Annotated[
+        float, typer.Option("--freq-low", help="Lower bandpass frequency (Hz).")
+    ] = 0.4,
+    freq_high: Annotated[
+        float, typer.Option("--freq-high", help="Upper bandpass frequency (Hz).")
+    ] = 3.0,
     n_scales: Annotated[int, typer.Option(help="Pyramid scales.")] = 6,
     n_orientations: Annotated[int, typer.Option(help="Orientation bands per scale.")] = 8,
-    sigma: Annotated[float, typer.Option(help="Spatial phase smoothing (0 = off).")] = 3.0,
-    filter_type: Annotated[str, typer.Option("--filter", help="'ideal' or 'butterworth'.")] = "ideal",
-    max_frames: Annotated[Optional[int], typer.Option("--max-frames", help="Limit frames read.")] = None,
-    chunk_size: Annotated[int, typer.Option("--chunk-size", help="Frames per GPU batch. Larger = faster but more VRAM (64 ≈ 10 GB at 1080p).")] = 64,
+    sigma: Annotated[float, typer.Option(help="Spatial phase smoothing (0 = off).")] = 0.0,
+    filter_type: Annotated[
+        str, typer.Option("--filter", help="'ideal' or 'butterworth'.")
+    ] = "ideal",
+    attenuate: Annotated[
+        bool,
+        typer.Option(
+            "--attenuate",
+            help="Attenuate large motions (e.g. camera shake) instead of amplifying them.",
+            is_flag=True,
+        ),
+    ] = False,
+    attenuate_mag: Annotated[
+        float, typer.Option("--attenuate-mag", help="Attenuation threshold in radians (default π).")
+    ] = math.pi,
+    notch: Annotated[
+        list[float] | None,
+        typer.Option("--notch", help="Frequency to notch out (Hz). Repeat for multiple."),
+    ] = None,
+    notch_width: Annotated[
+        float, typer.Option("--notch-width", help="Width of each notch in Hz.")
+    ] = 1.0,
+    max_frames: Annotated[
+        int | None, typer.Option("--max-frames", help="Limit frames read.")
+    ] = None,
+    chunk_size: Annotated[
+        int,
+        typer.Option(
+            "--chunk-size",
+            help="Frames per GPU batch. Larger = faster but more VRAM (64 ≈ 10 GB at 1080p).",
+        ),
+    ] = 64,
     device: _DeviceOption = None,
     debug: _DebugOption = False,
 ) -> None:
@@ -243,13 +319,10 @@ def phase(
     dev = _get_device(device)
 
     reader = VideoReader(input, device=dev, max_frames=max_frames)
-    meta   = reader.metadata
-    fps    = meta["fps"]
+    meta = reader.metadata
+    fps = meta["fps"]
     logger.info(f"Loading video: {input}")
-    logger.info(
-        f"  {meta['n_frames']} frames, {fps:.2f} fps, "
-        f"{meta['width']}×{meta['height']} px"
-    )
+    logger.info(f"  {meta['n_frames']} frames, {fps:.2f} fps, {meta['width']}×{meta['height']} px")
 
     magnifier = PhaseMagnifier(
         factor=factor,
@@ -259,12 +332,18 @@ def phase(
         n_orientations=n_orientations,
         sigma=sigma,
         filter_type=filter_type,
+        attenuate_motion=attenuate,
+        attenuate_mag=attenuate_mag,
+        notch_freqs=notch,
+        notch_width=notch_width,
         device=dev,
     )
 
     n_out = min(max_frames, meta["n_frames"]) if max_frames is not None else meta["n_frames"]
-    frame_stream     = reader.stream()
-    processed_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_out, chunk_size=chunk_size)
+    frame_stream = reader.stream()
+    processed_stream = magnifier.process_stream(
+        frame_stream, fps, n_frames=n_out, chunk_size=chunk_size
+    )
 
     logger.info(f"Saving result → {output}")
     writer = VideoWriter(output, fps=fps)
@@ -285,7 +364,9 @@ def info(
     """Show detected compute device and package information."""
     _setup_logging(debug)
     import torch  # noqa: PLC0415
-    from pyevm.device import device_info, get_device  # noqa: PLC0415
+
+    from pyevm.device import device_info  # noqa: PLC0415
+
     dev = _get_device(device)
     di = device_info(dev)
     typer.echo("EVM — Eulerian Video Magnification")
@@ -315,18 +396,20 @@ def dashboard(
         import streamlit.web.cli as stcli  # noqa: PLC0415
     except ImportError:
         typer.echo(
-            "Streamlit is not installed. Install it with:\n"
-            "  pip install streamlit",
+            "Streamlit is not installed. Install it with:\n  pip install streamlit",
             err=True,
         )
-        raise typer.Exit(code=1)
+        raise typer.Exit(code=1) from None
 
     import importlib.resources  # noqa: PLC0415
 
     app_path = importlib.resources.files("pyevm.app").joinpath("streamlit_app.py")
     sys.argv = [
-        "streamlit", "run", str(app_path),
-        "--server.headless", "false",
+        "streamlit",
+        "run",
+        str(app_path),
+        "--server.headless",
+        "false",
         f"--server.maxUploadSize={max_upload_size}",
     ]
     sys.exit(stcli.main())

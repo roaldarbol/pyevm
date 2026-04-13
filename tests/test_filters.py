@@ -1,10 +1,10 @@
 """Tests for temporal bandpass filters."""
 
 import math
-import torch
-import pytest
-from pyevm.filters.temporal import IdealBandpass, ButterworthBandpass
 
+import torch
+
+from pyevm.filters.temporal import ButterworthBandpass, IdealBandpass
 
 FPS = 30.0
 T = 300  # frames
@@ -24,6 +24,7 @@ def _make_signal(freq_hz: float, shape: tuple[int, ...] = (T,)) -> torch.Tensor:
 # IdealBandpass
 # ---------------------------------------------------------------------------
 
+
 class TestIdealBandpass:
     def test_passband_preserved(self):
         """Signal in the pass band should pass through nearly unchanged."""
@@ -40,7 +41,9 @@ class TestIdealBandpass:
         sig = _make_signal(10.0)  # well outside band
         out = filt.apply(sig)
         energy_ratio = out.norm() / (sig.norm() + 1e-9)
-        assert energy_ratio.item() < 0.1, f"Stopband attenuation insufficient: {energy_ratio.item():.3f}"
+        assert energy_ratio.item() < 0.1, (
+            f"Stopband attenuation insufficient: {energy_ratio.item():.3f}"
+        )
 
     def test_output_shape_preserved(self):
         filt = IdealBandpass(fps=FPS, freq_low=0.5, freq_high=2.0)
@@ -71,6 +74,7 @@ class TestIdealBandpass:
 # ---------------------------------------------------------------------------
 # ButterworthBandpass
 # ---------------------------------------------------------------------------
+
 
 class TestButterworthBandpass:
     def test_output_shape_preserved(self):
@@ -112,8 +116,9 @@ class TestButterworthBandpass:
         stream_out = torch.stack(stream_frames, dim=0)
 
         # Streaming IIR == batch IIR — should be essentially identical
-        assert torch.allclose(batch_out, stream_out, atol=1e-5), \
+        assert torch.allclose(batch_out, stream_out, atol=1e-5), (
             f"Max diff: {(batch_out - stream_out).abs().max().item()}"
+        )
 
     def test_reset_clears_state(self):
         filt = ButterworthBandpass(fps=FPS, freq_low=0.5, freq_high=2.0)

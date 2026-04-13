@@ -25,12 +25,10 @@ from __future__ import annotations
 
 import math
 
-import pytest
 import torch
 import torch.nn.functional as F
 
 from pyevm.magnification.phase import PhaseMagnifier
-
 
 FPS = 30.0
 
@@ -38,6 +36,7 @@ FPS = 30.0
 # ---------------------------------------------------------------------------
 # Helper: build a synthetic horizontal cosine fringe video
 # ---------------------------------------------------------------------------
+
 
 def _fringe_video(
     T: int,
@@ -57,9 +56,7 @@ def _fringe_video(
     disp = motion_amp * torch.sin(2 * math.pi * motion_freq * t)  # (T,)
     x = torch.arange(W, dtype=torch.float32)
     frames = [
-        (0.5 + 0.5 * torch.cos(k * (x - disp[i])))
-        .unsqueeze(0).expand(3, H, W)
-        for i in range(T)
+        (0.5 + 0.5 * torch.cos(k * (x - disp[i]))).unsqueeze(0).expand(3, H, W) for i in range(T)
     ]
     return torch.stack(frames)  # (T, 3, H, W)
 
@@ -67,6 +64,7 @@ def _fringe_video(
 # ---------------------------------------------------------------------------
 # 1.  Amplitude-weighted spatial smoothing
 # ---------------------------------------------------------------------------
+
 
 class TestAmplitudeWeightedSmoothing:
     """_smooth_phase must implement Eq. 17 of Wadhwa et al. 2013."""
@@ -86,7 +84,7 @@ class TestAmplitudeWeightedSmoothing:
         H, W = 64, 64
         sigma = 2.0
         clean_val = 1.0
-        margin = int(3 * sigma) + 1   # stay away from the left/right boundary
+        margin = int(3 * sigma) + 1  # stay away from the left/right boundary
 
         amplitude = torch.zeros(H, W)
         amplitude[:, : W // 2] = 1.0
@@ -100,9 +98,7 @@ class TestAmplitudeWeightedSmoothing:
         smoothed = mag._smooth_phase(phase, amplitude)
 
         interior = smoothed[:, margin : W // 2 - margin]
-        assert interior.numel() > 0, (
-            "Interior region is empty — increase W or reduce sigma"
-        )
+        assert interior.numel() > 0, "Interior region is empty — increase W or reduce sigma"
         max_err = (interior - clean_val).abs().max().item()
         assert max_err < 0.05, (
             f"High-amplitude region corrupted by noisy neighbour: "
@@ -133,7 +129,7 @@ class TestAmplitudeWeightedSmoothing:
         radius = int(3 * sigma)
         size = 2 * radius + 1
         coords = torch.arange(size, dtype=torch.float32) - radius
-        g1d = torch.exp(-coords ** 2 / (2 * sigma ** 2))
+        g1d = torch.exp(-(coords**2) / (2 * sigma**2))
         g1d /= g1d.sum()
         kernel = torch.outer(g1d, g1d).unsqueeze(0).unsqueeze(0)
         plain = F.conv2d(phase.unsqueeze(0).unsqueeze(0), kernel, padding=radius).squeeze()
@@ -169,7 +165,7 @@ class TestAmplitudeWeightedSmoothing:
 
         size = 2 * radius + 1
         coords = torch.arange(size, dtype=torch.float32) - radius
-        g1d = torch.exp(-coords ** 2 / (2 * sigma ** 2))
+        g1d = torch.exp(-(coords**2) / (2 * sigma**2))
         g1d /= g1d.sum()
         kernel = torch.outer(g1d, g1d).unsqueeze(0).unsqueeze(0)
         plain = F.conv2d(phase.unsqueeze(0).unsqueeze(0), kernel, padding=radius).squeeze()
@@ -215,6 +211,7 @@ class TestAmplitudeWeightedSmoothing:
 # 2.  Static video is unchanged
 # ---------------------------------------------------------------------------
 
+
 class TestStaticVideoUnchanged:
     """Δφ = 0 for a static scene → filtered phase = 0 → output = input."""
 
@@ -225,15 +222,17 @@ class TestStaticVideoUnchanged:
         video = frame.unsqueeze(0).expand(T, -1, -1, -1).clone()
 
         mag = PhaseMagnifier(
-            factor=25.0, freq_low=0.5, freq_high=3.0,
-            n_scales=3, n_orientations=4, sigma=3.0,
+            factor=25.0,
+            freq_low=0.5,
+            freq_high=3.0,
+            n_scales=3,
+            n_orientations=4,
+            sigma=3.0,
         )
         out = mag.process(video, fps=FPS)
 
         max_diff = (out - video.clamp(0, 1)).abs().max().item()
-        assert max_diff < 1e-4, (
-            f"Static video should be unchanged; max diff = {max_diff:.6f}"
-        )
+        assert max_diff < 1e-4, f"Static video should be unchanged; max diff = {max_diff:.6f}"
 
     def test_identical_frames_sigma_zero(self):
         torch.manual_seed(6)
@@ -242,8 +241,12 @@ class TestStaticVideoUnchanged:
         video = frame.unsqueeze(0).expand(T, -1, -1, -1).clone()
 
         mag = PhaseMagnifier(
-            factor=25.0, freq_low=0.5, freq_high=3.0,
-            n_scales=3, n_orientations=4, sigma=0.0,
+            factor=25.0,
+            freq_low=0.5,
+            freq_high=3.0,
+            n_scales=3,
+            n_orientations=4,
+            sigma=0.0,
         )
         out = mag.process(video, fps=FPS)
 
@@ -257,6 +260,7 @@ class TestStaticVideoUnchanged:
 # 3.  In-band motion is amplified
 # ---------------------------------------------------------------------------
 
+
 class TestKnownMotionMagnification:
     """Temporal variation should increase after magnifying in-band motion."""
 
@@ -266,21 +270,26 @@ class TestKnownMotionMagnification:
         We measure the temporal standard deviation across all pixels and verify
         that the output has larger variation than the input.
         """
-        T = 60         # 2 s @ 30 fps
+        T = 60  # 2 s @ 30 fps
         factor = 4.0
-        motion_freq = 1.0   # Hz — inside the [0.5, 2.0] Hz passband
-        motion_amp = 0.4    # pixels
+        motion_freq = 1.0  # Hz — inside the [0.5, 2.0] Hz passband
+        motion_amp = 0.4  # pixels
 
-        video = _fringe_video(T, H=32, W=64, k_cycles=6.0,
-                              motion_amp=motion_amp, motion_freq=motion_freq)
+        video = _fringe_video(
+            T, H=32, W=64, k_cycles=6.0, motion_amp=motion_amp, motion_freq=motion_freq
+        )
 
         mag = PhaseMagnifier(
-            factor=factor, freq_low=0.5, freq_high=2.0,
-            n_scales=2, n_orientations=4, sigma=0.0,  # no smoothing for clarity
+            factor=factor,
+            freq_low=0.5,
+            freq_high=2.0,
+            n_scales=2,
+            n_orientations=4,
+            sigma=0.0,  # no smoothing for clarity
         )
         out = mag.process(video, fps=FPS)
 
-        in_std  = video.float().std(dim=0).mean().item()
+        in_std = video.float().std(dim=0).mean().item()
         out_std = out.float().std(dim=0).mean().item()
 
         assert out_std > in_std, (
@@ -296,19 +305,24 @@ class TestKnownMotionMagnification:
         """
         T = 60
         factor = 10.0
-        motion_freq = 10.0   # Hz — well outside the [0.5, 2.0] Hz passband
+        motion_freq = 10.0  # Hz — well outside the [0.5, 2.0] Hz passband
         motion_amp = 0.4
 
-        video = _fringe_video(T, H=32, W=64, k_cycles=6.0,
-                              motion_amp=motion_amp, motion_freq=motion_freq)
+        video = _fringe_video(
+            T, H=32, W=64, k_cycles=6.0, motion_amp=motion_amp, motion_freq=motion_freq
+        )
 
         mag = PhaseMagnifier(
-            factor=factor, freq_low=0.5, freq_high=2.0,
-            n_scales=2, n_orientations=4, sigma=0.0,
+            factor=factor,
+            freq_low=0.5,
+            freq_high=2.0,
+            n_scales=2,
+            n_orientations=4,
+            sigma=0.0,
         )
         out = mag.process(video, fps=FPS)
 
-        in_std  = video.float().std(dim=0).mean().item()
+        in_std = video.float().std(dim=0).mean().item()
         out_std = out.float().std(dim=0).mean().item()
 
         # Output variation should be similar to input (not amplified)
@@ -323,20 +337,126 @@ class TestKnownMotionMagnification:
         T = 60
         motion_freq = 1.0
 
-        video = _fringe_video(T, H=32, W=64, k_cycles=6.0,
-                              motion_amp=0.4, motion_freq=motion_freq)
+        video = _fringe_video(T, H=32, W=64, k_cycles=6.0, motion_amp=0.4, motion_freq=motion_freq)
 
         def _run(factor: float) -> float:
             mag = PhaseMagnifier(
-                factor=factor, freq_low=0.5, freq_high=2.0,
-                n_scales=2, n_orientations=4, sigma=0.0,
+                factor=factor,
+                freq_low=0.5,
+                freq_high=2.0,
+                n_scales=2,
+                n_orientations=4,
+                sigma=0.0,
             )
             return mag.process(video, fps=FPS).std(dim=0).mean().item()
 
-        std_low  = _run(1.0)
+        std_low = _run(1.0)
         std_high = _run(8.0)
 
         assert std_high > std_low, (
-            f"factor=8 output std {std_high:.4f} should exceed "
-            f"factor=1 output std {std_low:.4f}"
+            f"factor=8 output std {std_high:.4f} should exceed factor=1 output std {std_low:.4f}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# 4.  Large-motion attenuation (Fig. 11)
+# ---------------------------------------------------------------------------
+
+
+class TestLargeMotionAttenuation:
+    """attenuate_motion=True must suppress large phase changes while leaving
+    small ones intact.
+    """
+
+    def test_apply_attenuation_bounds_phase(self):
+        """_apply_attenuation must wrap all output values into [−lim, +lim]."""
+        lim = math.pi
+        amp_phase = torch.linspace(-10 * lim, 10 * lim, 200)
+        mag = PhaseMagnifier(n_scales=2, n_orientations=4, attenuate_motion=True, attenuate_mag=lim)
+        out = mag._apply_attenuation(amp_phase)
+        assert out.abs().max().item() <= lim + 1e-5, (
+            f"Attenuated phases must be in [−π, π]; max |out| = {out.abs().max():.5f}"
+        )
+
+    def test_apply_attenuation_passthrough_small(self):
+        """Values strictly inside (−lim, +lim) must pass through unchanged."""
+        lim = math.pi
+        # Exclude exactly ±lim where the wrap boundary sits
+        amp_phase = torch.linspace(-lim + 0.01, lim - 0.01, 50)
+        mag = PhaseMagnifier(n_scales=2, n_orientations=4, attenuate_motion=True, attenuate_mag=lim)
+        out = mag._apply_attenuation(amp_phase)
+        assert torch.allclose(out, amp_phase, atol=1e-5), (
+            "Small phases (|amp| < π) should pass through attenuation unchanged"
+        )
+
+    def test_apply_attenuation_2pi_maps_to_zero(self):
+        """Amplified phase of ±2·lim should wrap to 0 — motion fully cancelled."""
+        lim = math.pi
+        amp_phase = torch.tensor([2 * lim, -2 * lim])
+        mag = PhaseMagnifier(n_scales=2, n_orientations=4, attenuate_motion=True, attenuate_mag=lim)
+        out = mag._apply_attenuation(amp_phase)
+        assert torch.allclose(out, torch.zeros(2), atol=1e-5), (
+            f"amp_phase = ±2π should wrap to 0; got {out.tolist()}"
+        )
+
+    def test_small_motion_unaffected_by_attenuation(self):
+        """With small amp_phase (< π), attenuation leaves the output unchanged."""
+        T = 60
+        # Tiny motion so factor * filtered_phase << π
+        video = _fringe_video(T, H=32, W=64, k_cycles=6.0, motion_amp=0.01, motion_freq=1.0)
+
+        mag_plain = PhaseMagnifier(
+            factor=2.0,
+            freq_low=0.5,
+            freq_high=2.0,
+            n_scales=2,
+            n_orientations=4,
+            sigma=0.0,
+            attenuate_motion=False,
+        )
+        mag_att = PhaseMagnifier(
+            factor=2.0,
+            freq_low=0.5,
+            freq_high=2.0,
+            n_scales=2,
+            n_orientations=4,
+            sigma=0.0,
+            attenuate_motion=True,
+        )
+        out_plain = mag_plain.process(video, fps=FPS)
+        out_att = mag_att.process(video, fps=FPS)
+
+        max_diff = (out_plain - out_att).abs().max().item()
+        assert max_diff < 1e-4, (
+            f"Attenuation should not affect small-motion output; max diff = {max_diff:.6f}"
+        )
+
+    def test_attenuation_threshold_controls_effect(self):
+        """Smaller attenuate_mag triggers attenuation at lower phase values,
+        producing less variation than a larger threshold for the same large motion.
+        """
+        T = 60
+        video = _fringe_video(T, H=32, W=64, k_cycles=6.0, motion_amp=1.0, motion_freq=1.0)
+
+        def _run(attenuate_mag: float) -> float:
+            mag = PhaseMagnifier(
+                factor=20.0,
+                freq_low=0.5,
+                freq_high=2.0,
+                n_scales=2,
+                n_orientations=4,
+                sigma=0.0,
+                attenuate_motion=True,
+                attenuate_mag=attenuate_mag,
+            )
+            return mag.process(video, fps=FPS).std(dim=0).mean().item()
+
+        import math
+
+        std_small_lim = _run(math.pi / 4)
+        std_large_lim = _run(math.pi)
+
+        assert std_small_lim <= std_large_lim + 1e-4, (
+            f"Smaller attenuation threshold should not produce more variation: "
+            f"π/4 → std={std_small_lim:.4f}, π → std={std_large_lim:.4f}"
         )

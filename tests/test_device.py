@@ -1,8 +1,9 @@
 """Tests for device detection utilities."""
 
-import torch
 import pytest
-from pyevm.device import get_device, device_info
+import torch
+
+from pyevm.device import device_info, get_device
 
 
 def test_get_device_cpu_forced():

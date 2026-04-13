@@ -1,0 +1,15 @@
+pre-commit:
+  commands:
+    format:
+      glob: "*.py"
+      run: ruff format {staged_files}
+      stage_fixed: true
+    lint:
+      glob: "*.py"
+      run: ruff check --fix {staged_files}
+      stage_fixed: true
+
+pre-push:
+  commands:
+    tests:
+      run: python -m pytest --tb=short -q

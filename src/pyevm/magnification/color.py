@@ -54,6 +54,8 @@ class ColorMagnifier:
         chrom_attenuation: float = 0.1,
         pyramid_level: int | None = None,
         filter_type: str = "ideal",
+        notch_freqs: list[float] | None = None,
+        notch_width: float = 1.0,
         device: torch.device | None = None,
         dtype: torch.dtype = torch.float32,
     ) -> None:
@@ -64,6 +66,8 @@ class ColorMagnifier:
         self.chrom_attenuation = chrom_attenuation
         self.pyramid_level = pyramid_level if pyramid_level is not None else n_levels - 1
         self.filter_type = filter_type
+        self.notch_freqs = notch_freqs or []
+        self.notch_width = notch_width
         self.device = device or torch.device("cpu")
         self.dtype = dtype
 
@@ -104,10 +108,22 @@ class ColorMagnifier:
 
         # --- Temporal filtering ---
         if self.filter_type == "ideal":
-            filt = IdealBandpass(fps, self.freq_low, self.freq_high)
+            filt = IdealBandpass(
+                fps,
+                self.freq_low,
+                self.freq_high,
+                notch_freqs=self.notch_freqs,
+                notch_width=self.notch_width,
+            )
             filtered = filt.apply(level_tensor)  # (T, 3, h, w)
         else:
-            filt = ButterworthBandpass(fps, self.freq_low, self.freq_high)
+            filt = ButterworthBandpass(
+                fps,
+                self.freq_low,
+                self.freq_high,
+                notch_freqs=self.notch_freqs,
+                notch_width=self.notch_width,
+            )
             filtered = filt.apply(level_tensor)
 
         # --- Amplify: Y × alpha, I/Q × alpha × chrom_attenuation ---
@@ -154,15 +170,21 @@ class ColorMagnifier:
         Yields:
             Amplified ``(C, H, W)`` float32 RGB tensors, clamped to ``[0, 1]``.
         """
-        filt = ButterworthBandpass(fps, self.freq_low, self.freq_high)
+        filt = ButterworthBandpass(
+            fps,
+            self.freq_low,
+            self.freq_high,
+            notch_freqs=self.notch_freqs,
+            notch_width=self.notch_width,
+        )
 
         def _process_chunk(chunk: list[torch.Tensor]) -> Generator[torch.Tensor, None, None]:
-            batch = torch.stack(chunk)          # (N, C, H, W)
+            batch = torch.stack(chunk)  # (N, C, H, W)
             N, C, H, W = batch.shape
 
             t0 = time.perf_counter()
-            yiq = rgb_to_yiq(batch)             # (N, 3, H, W)
-            levels = self._pyramid.build(yiq)   # list of (N, 3, h, w)
+            yiq = rgb_to_yiq(batch)  # (N, 3, H, W)
+            levels = self._pyramid.build(yiq)  # list of (N, 3, h, w)
             level_t = levels[self.pyramid_level]  # (N, 3, h, w)
             t_build = time.perf_counter() - t0
 
@@ -192,9 +214,9 @@ class ColorMagnifier:
 
             logger.debug(
                 f"  [color chunk N={N}]  "
-                f"build={t_build*1000:.1f}ms  "
-                f"filter={t_filter*1000:.1f}ms  "
-                f"reconstruct={t_reconstruct*1000:.1f}ms"
+                f"build={t_build * 1000:.1f}ms  "
+                f"filter={t_filter * 1000:.1f}ms  "
+                f"reconstruct={t_reconstruct * 1000:.1f}ms"
             )
             yield from result_rgb
 
@@ -208,7 +230,9 @@ class ColorMagnifier:
                         yield out_frame
                         bar.update(1)
                     elapsed = time.perf_counter() - t0
-                    logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")
+                    logger.debug(
+                        f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk) / elapsed:.1f} fps)"
+                    )
                     chunk = []
             if chunk:
                 t0 = time.perf_counter()
@@ -216,4 +240,6 @@ class ColorMagnifier:
                     yield out_frame
                     bar.update(1)
                 elapsed = time.perf_counter() - t0
-                logger.debug(f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk)/elapsed:.1f} fps)")
+                logger.debug(
+                    f"Chunk {len(chunk)} frames: {elapsed:.2f}s ({len(chunk) / elapsed:.1f} fps)"
+                )

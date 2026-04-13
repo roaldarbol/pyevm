@@ -9,7 +9,6 @@ robustness (chunk boundaries, edge cases) without requiring a real video file.
 from __future__ import annotations
 
 import torch
-import pytest
 
 from pyevm.magnification.color import ColorMagnifier
 from pyevm.magnification.motion import MotionMagnifier
@@ -20,13 +19,13 @@ FPS = 30.0
 
 def _stream(video: torch.Tensor):
     """Yield individual ``(C, H, W)`` frames from a ``(T, C, H, W)`` tensor."""
-    for frame in video:
-        yield frame
+    yield from video
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _collect(gen) -> torch.Tensor:
     """Collect all frames from a generator into a ``(T, C, H, W)`` tensor."""
@@ -37,8 +36,8 @@ def _collect(gen) -> torch.Tensor:
 # ColorMagnifier streaming
 # ---------------------------------------------------------------------------
 
-class TestColorMagnifierStream:
 
+class TestColorMagnifierStream:
     def test_output_shape(self, small_video):
         mag = ColorMagnifier(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3)
         out = _collect(mag.process_stream(_stream(small_video), FPS, chunk_size=8))
@@ -75,8 +74,9 @@ class TestColorMagnifierStream:
 
     def test_matches_batch_butterworth(self, small_video):
         """Stream output must match batch process() when both use Butterworth."""
-        kwargs = dict(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3,
-                      filter_type="butterworth")
+        kwargs = {
+            "alpha": 10.0, "freq_low": 0.5, "freq_high": 3.0, "n_levels": 3, "filter_type": "butterworth"
+        }
         batch_out = ColorMagnifier(**kwargs).process(small_video, FPS)
         stream_out = _collect(
             ColorMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8)
@@ -87,9 +87,13 @@ class TestColorMagnifierStream:
 
     def test_chunk_boundary_consistency(self, small_video):
         """Different chunk sizes must give the same output (IIR state is preserved)."""
-        kwargs = dict(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3)
-        out_8  = _collect(ColorMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8))
-        out_15 = _collect(ColorMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=15))
+        kwargs = {"alpha": 10.0, "freq_low": 0.5, "freq_high": 3.0, "n_levels": 3}
+        out_8 = _collect(
+            ColorMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8)
+        )
+        out_15 = _collect(
+            ColorMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=15)
+        )
         assert torch.allclose(out_8, out_15, atol=1e-5), (
             f"Max diff between chunk_size=8 and chunk_size=15: "
             f"{(out_8 - out_15).abs().max().item():.2e}"
@@ -100,8 +104,8 @@ class TestColorMagnifierStream:
 # MotionMagnifier streaming
 # ---------------------------------------------------------------------------
 
-class TestMotionMagnifierStream:
 
+class TestMotionMagnifierStream:
     def test_output_shape(self, small_video):
         mag = MotionMagnifier(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3)
         out = _collect(mag.process_stream(_stream(small_video), FPS, chunk_size=8))
@@ -136,9 +140,10 @@ class TestMotionMagnifierStream:
 
     def test_matches_batch_butterworth(self, small_video):
         """Stream output must match batch process() (both use Butterworth by default)."""
-        kwargs = dict(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3,
-                      filter_type="butterworth")
-        batch_out  = MotionMagnifier(**kwargs).process(small_video, FPS)
+        kwargs = {
+            "alpha": 10.0, "freq_low": 0.5, "freq_high": 3.0, "n_levels": 3, "filter_type": "butterworth"
+        }
+        batch_out = MotionMagnifier(**kwargs).process(small_video, FPS)
         stream_out = _collect(
             MotionMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8)
         )
@@ -148,9 +153,13 @@ class TestMotionMagnifierStream:
 
     def test_chunk_boundary_consistency(self, small_video):
         """Different chunk sizes must give the same output."""
-        kwargs = dict(alpha=10.0, freq_low=0.5, freq_high=3.0, n_levels=3)
-        out_8  = _collect(MotionMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8))
-        out_15 = _collect(MotionMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=15))
+        kwargs = {"alpha": 10.0, "freq_low": 0.5, "freq_high": 3.0, "n_levels": 3}
+        out_8 = _collect(
+            MotionMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8)
+        )
+        out_15 = _collect(
+            MotionMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=15)
+        )
         assert torch.allclose(out_8, out_15, atol=1e-5), (
             f"Max diff: {(out_8 - out_15).abs().max().item():.2e}"
         )
@@ -160,8 +169,8 @@ class TestMotionMagnifierStream:
 # PhaseMagnifier streaming
 # ---------------------------------------------------------------------------
 
-class TestPhaseMagnifierStream:
 
+class TestPhaseMagnifierStream:
     def test_output_shape(self, small_video):
         mag = PhaseMagnifier(factor=2.0, freq_low=0.5, freq_high=3.0, n_scales=2, n_orientations=4)
         out = _collect(mag.process_stream(_stream(small_video), FPS, chunk_size=8))
@@ -196,9 +205,13 @@ class TestPhaseMagnifierStream:
 
     def test_chunk_boundary_consistency(self, small_video):
         """Different chunk sizes must give the same output (IIR state preserved)."""
-        kwargs = dict(factor=2.0, freq_low=0.5, freq_high=3.0, n_scales=2, n_orientations=4)
-        out_8  = _collect(PhaseMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8))
-        out_15 = _collect(PhaseMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=15))
+        kwargs = {"factor": 2.0, "freq_low": 0.5, "freq_high": 3.0, "n_scales": 2, "n_orientations": 4}
+        out_8 = _collect(
+            PhaseMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=8)
+        )
+        out_15 = _collect(
+            PhaseMagnifier(**kwargs).process_stream(_stream(small_video), FPS, chunk_size=15)
+        )
         assert torch.allclose(out_8, out_15, atol=1e-5), (
             f"Max diff: {(out_8 - out_15).abs().max().item():.2e}"
         )

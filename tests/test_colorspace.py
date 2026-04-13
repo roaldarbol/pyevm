@@ -1,7 +1,8 @@
 """Tests for RGB ↔ YIQ colorspace conversions."""
 
-import torch
 import pytest
+import torch
+
 from pyevm.magnification._colorspace import rgb_to_yiq, yiq_to_rgb
 
 
@@ -14,8 +15,9 @@ def rgb_batch():
 def test_round_trip(rgb_batch):
     """RGB → YIQ → RGB should recover the original within float precision."""
     recovered = yiq_to_rgb(rgb_to_yiq(rgb_batch))
-    assert torch.allclose(rgb_batch, recovered, atol=1e-6), \
+    assert torch.allclose(rgb_batch, recovered, atol=1e-6), (
         f"Max abs diff: {(rgb_batch - recovered).abs().max().item()}"
+    )
 
 
 def test_output_shape(rgb_batch):

@@ -9,8 +9,8 @@
 </p>
 
 <p align="center">
-  <a href="https://pypi.org/project/pyevm"><img src="https://img.shields.io/pypi/v/pyevm.svg" alt="PyPI version"/></a>
-  <a href="https://pypi.org/project/pyevm"><img src="https://img.shields.io/pypi/pyversions/pyevm.svg" alt="Python versions"/></a>
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/pypi/v/pyeulervid.svg" alt="PyPI version"/></a>
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/pypi/pyversions/pyeulervid.svg" alt="Python versions"/></a>
   <a href="https://github.com/roaldarbol/pyevm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roaldarbol/pyevm" alt="License"/></a>
   <a href="https://github.com/roaldarbol/pyevm/actions"><img src="https://img.shields.io/github/actions/workflow/status/roaldarbol/pyevm/ci.yml?label=CI" alt="CI status"/></a>
   <img src="https://img.shields.io/badge/PyTorch-%3E%3D2.2-ee4c2c?logo=pytorch&logoColor=white" alt="PyTorch"/>
@@ -41,18 +41,19 @@ Eulerian Video Magnification (EVM) is a computational technique that amplifies s
 ### pip
 
 ```bash
-pip install pyevm
+pip install pyeulervid
 ```
 
 ### uv
 
 ```bash
-uv add pyevm
+uv add pyeulervid
 ```
 
-### pixi
+### conda / pixi (conda-forge)
 
 ```bash
+conda install -c conda-forge pyevm
 pixi add pyevm
 ```
 
@@ -62,11 +63,12 @@ pixi add pyevm
 
 ```bash
 # pip / uv (Linux only)
-pip install "pyevm[fast-io]"
-uv add "pyevm[fast-io]"
+pip install "pyeulervid[fast-io]"
+uv add "pyeulervid[fast-io]"
 
-# pixi — works on Windows + Linux + macOS
-pixi add pyevm  # torchcodec is included automatically via pixi.toml
+# conda-forge — works on Windows + Linux + macOS
+conda install -c conda-forge pyevm  # torchcodec is included automatically
+pixi add pyevm
 ```
 
 ## Quick start
@@ -168,8 +170,10 @@ Artifact-free motion magnification via steerable pyramid phase decomposition.
 | `--freq-high` | `3.0` | Upper bandpass frequency (Hz) |
 | `--n-scales` | `6` | Pyramid scales |
 | `--n-orientations` | `8` | Orientation bands per scale |
-| `--sigma` | `3.0` | Spatial phase smoothing (0 = off) |
+| `--sigma` | `0.0` | Spatial phase smoothing (0 = off) |
 | `--filter` | `ideal` | Filter type for batch mode; streaming always uses `butterworth` |
+| `--attenuate` | off | Attenuate large motions (camera shake) instead of amplifying them (Fig. 11) |
+| `--attenuate-mag` | `π` | Attenuation threshold in radians |
 | `--chunk-size` | `64` | Frames per GPU batch (64 ≈ 10 GB VRAM at 1080p) |
 | `--max-frames` | — | Limit number of frames read |
 | `--device` | auto | Compute device: `cuda`, `mps`, or `cpu` |

@@ -84,8 +84,6 @@ class LaplacianPyramid:
         """
         result = levels[-1]
         for i in range(len(levels) - 2, -1, -1):
-            result = _upsample_blur(
-                result, self._kernel, levels[i].shape[2], levels[i].shape[3]
-            )
+            result = _upsample_blur(result, self._kernel, levels[i].shape[2], levels[i].shape[3])
             result = result + levels[i]
         return result
