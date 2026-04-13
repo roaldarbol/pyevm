@@ -90,8 +90,8 @@ def _color_params() -> dict:
     st.sidebar.markdown("### Algorithm Parameters")
     return {
         "alpha": st.sidebar.slider("Alpha (amplification)", 5.0, 200.0, 50.0, step=5.0),
-        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 10.0, 0.4, step=0.05, format="%.2f"),
-        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 30.0, 3.0, step=0.1, format="%.1f"),
+        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"),
+        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"),
         "n_levels": st.sidebar.slider("Pyramid levels", 2, 8, 6),
         "chrom_attenuation": st.sidebar.slider("Chrominance attenuation", 0.0, 1.0, 0.1, step=0.05),
         "filter_type": st.sidebar.selectbox("Filter type", ["ideal", "butterworth"]),
@@ -102,8 +102,8 @@ def _motion_params() -> dict:
     st.sidebar.markdown("### Algorithm Parameters")
     return {
         "alpha": st.sidebar.slider("Alpha (amplification)", 1.0, 100.0, 20.0, step=1.0),
-        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 10.0, 0.4, step=0.05, format="%.2f"),
-        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 30.0, 3.0, step=0.1, format="%.1f"),
+        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"),
+        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"),
         "n_levels": st.sidebar.slider("Pyramid levels", 2, 8, 6),
         "lambda_c": st.sidebar.slider("Lambda c (spatial cutoff, px)", 4.0, 64.0, 16.0, step=2.0),
         "filter_type": st.sidebar.selectbox("Filter type", ["butterworth", "ideal"]),
@@ -114,8 +114,8 @@ def _phase_params() -> dict:
     st.sidebar.markdown("### Algorithm Parameters")
     return {
         "factor": st.sidebar.slider("Factor (phase amplification)", 1.0, 100.0, 10.0, step=1.0),
-        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 10.0, 0.4, step=0.05, format="%.2f"),
-        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 30.0, 3.0, step=0.1, format="%.1f"),
+        "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 1000.0, 0.4, step=0.05, format="%.2f"),
+        "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 1000.0, 3.0, step=0.05, format="%.2f"),
         "n_scales": st.sidebar.slider("Pyramid scales", 2, 8, 6),
         "n_orientations": st.sidebar.slider("Orientations per scale", 2, 8, 8),
         "sigma": st.sidebar.slider("Phase smoothing sigma (0 = off)", 0.0, 10.0, 3.0, step=0.5),
