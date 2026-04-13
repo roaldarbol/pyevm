@@ -58,17 +58,15 @@ pixi add pyevm
 
 ### Optional: GPU-accelerated video I/O
 
-`decord` enables faster video decoding on GPU. Available on **Linux and Windows only** (no macOS wheels).
+`torchcodec` enables faster video decoding via FFmpeg. pip wheels are **Linux-only**; on Windows install via pixi (conda-forge provides Windows CUDA builds):
 
 ```bash
-# pip
+# pip / uv (Linux only)
 pip install "pyevm[fast-io]"
-
-# uv
 uv add "pyevm[fast-io]"
 
-# pixi
-pixi add --pypi "pyevm[fast-io]"
+# pixi — works on Windows + Linux + macOS
+pixi add pyevm  # torchcodec is included automatically via pixi.toml
 ```
 
 ## Quick start
@@ -76,28 +74,25 @@ pixi add --pypi "pyevm[fast-io]"
 ### Python API
 
 ```python
-import torch
 from pyevm import ColorMagnifier, MotionMagnifier, PhaseMagnifier
 from pyevm.io.video import VideoReader, VideoWriter
 
-# Load video
 reader = VideoReader("input.mp4")
+
+# --- Batch mode (loads all frames into memory) ---
 frames, fps = reader.read()
 
-# --- Colour magnification (e.g. pulse detection) ---
 magnifier = ColorMagnifier(alpha=50, freq_low=0.4, freq_high=3.0)
 result = magnifier.process(frames, fps)
 
-# --- Motion magnification (e.g. breathing, vibrations) ---
-magnifier = MotionMagnifier(alpha=20, freq_low=0.4, freq_high=3.0)
-result = magnifier.process(frames, fps)
-
-# --- Phase-based magnification (artifact-free) ---
-magnifier = PhaseMagnifier(factor=10, freq_low=0.4, freq_high=3.0)
-result = magnifier.process(frames, fps)
-
-# Save result
 VideoWriter("output.mp4", fps=fps).write(result)
+
+# --- Streaming mode (O(1) memory — recommended for long/HD video) ---
+magnifier = MotionMagnifier(alpha=20, freq_low=0.4, freq_high=3.0)
+
+frame_stream, fps, n_frames = reader.stream()
+output_stream = magnifier.process_stream(frame_stream, fps, n_frames=n_frames)
+VideoWriter("output.mp4", fps=fps).write_stream(output_stream)
 ```
 
 ### CLI
@@ -116,7 +111,7 @@ pyevm phase input.mp4 output.mp4 --factor 10 --freq-low 0.4 --freq-high 3.0
 pyevm info
 ```
 
-Add `--debug` to any command for verbose logging.
+Add `--debug` to any command for verbose logging, including per-chunk timing breakdowns (pyramid build / filter / collapse) to identify performance bottlenecks.
 
 ### Streamlit app
 
@@ -138,7 +133,8 @@ Amplifies subtle colour changes (e.g. skin-tone flush from pulse).
 | `--n-levels` | `6` | Gaussian pyramid levels |
 | `--chrom-attenuation` | `0.1` | Chrominance attenuation (0–1) |
 | `--pyramid-level` | auto | Pyramid level to filter |
-| `--filter` | `ideal` | Filter type: `ideal` or `butterworth` |
+| `--filter` | `ideal` | Filter type for batch mode; streaming always uses `butterworth` |
+| `--chunk-size` | `64` | Frames per GPU batch (streaming mode) |
 | `--max-frames` | — | Limit number of frames read |
 | `--device` | auto | Compute device: `cuda`, `mps`, or `cpu` |
 
@@ -154,6 +150,7 @@ Amplifies subtle physical motion (e.g. breathing, structural vibration).
 | `--n-levels` | `6` | Laplacian pyramid levels |
 | `--lambda-c` | `16.0` | Spatial wavelength cutoff (px) |
 | `--filter` | `butterworth` | Filter type: `butterworth` or `ideal` |
+| `--chunk-size` | `64` | Frames per GPU batch (streaming mode) |
 | `--max-frames` | — | Limit number of frames read |
 | `--device` | auto | Compute device: `cuda`, `mps`, or `cpu` |
 
@@ -169,7 +166,8 @@ Artifact-free motion magnification via steerable pyramid phase decomposition.
 | `--n-scales` | `4` | Pyramid scales |
 | `--n-orientations` | `6` | Orientation bands per scale |
 | `--sigma` | `3.0` | Spatial phase smoothing (0 = off) |
-| `--filter` | `ideal` | Filter type: `ideal` or `butterworth` |
+| `--filter` | `ideal` | Filter type for batch mode; streaming always uses `butterworth` |
+| `--chunk-size` | `64` | Frames per GPU batch (64 ≈ 10 GB VRAM at 1080p) |
 | `--max-frames` | — | Limit number of frames read |
 | `--device` | auto | Compute device: `cuda`, `mps`, or `cpu` |
 
