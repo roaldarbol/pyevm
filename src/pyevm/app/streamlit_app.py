@@ -116,8 +116,8 @@ def _phase_params() -> dict:
         "factor": st.sidebar.slider("Factor (phase amplification)", 1.0, 100.0, 10.0, step=1.0),
         "freq_low": st.sidebar.number_input("Freq low (Hz)", 0.05, 10.0, 0.4, step=0.05, format="%.2f"),
         "freq_high": st.sidebar.number_input("Freq high (Hz)", 0.1, 30.0, 3.0, step=0.1, format="%.1f"),
-        "n_scales": st.sidebar.slider("Pyramid scales", 2, 8, 4),
-        "n_orientations": st.sidebar.slider("Orientations per scale", 2, 8, 6),
+        "n_scales": st.sidebar.slider("Pyramid scales", 2, 8, 6),
+        "n_orientations": st.sidebar.slider("Orientations per scale", 2, 8, 8),
         "sigma": st.sidebar.slider("Phase smoothing sigma (0 = off)", 0.0, 10.0, 3.0, step=0.5),
         "filter_type": st.sidebar.selectbox("Filter type", ["ideal", "butterworth"]),
     }

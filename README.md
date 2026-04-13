@@ -166,8 +166,8 @@ Artifact-free motion magnification via steerable pyramid phase decomposition.
 | `--factor` | `10.0` | Phase amplification factor |
 | `--freq-low` | `0.4` | Lower bandpass frequency (Hz) |
 | `--freq-high` | `3.0` | Upper bandpass frequency (Hz) |
-| `--n-scales` | `4` | Pyramid scales |
-| `--n-orientations` | `6` | Orientation bands per scale |
+| `--n-scales` | `6` | Pyramid scales |
+| `--n-orientations` | `8` | Orientation bands per scale |
 | `--sigma` | `3.0` | Spatial phase smoothing (0 = off) |
 | `--filter` | `ideal` | Filter type for batch mode; streaming always uses `butterworth` |
 | `--chunk-size` | `64` | Frames per GPU batch (64 ≈ 10 GB VRAM at 1080p) |
