@@ -1,24 +1,31 @@
 """Streamlit web application for Eulerian Video Magnification.
 
 Launch with:
-    streamlit run src/evm/app/streamlit_app.py
+    pyevm dashboard
 """
 
 from __future__ import annotations
 
-import io
+import os
+import sys
 import tempfile
 from pathlib import Path
 
-import streamlit as st
-import torch
 from loguru import logger
 
-from pyevm.device import get_device
-from pyevm.io.video import VideoReader, VideoWriter
-from pyevm.magnification.color import ColorMagnifier
-from pyevm.magnification.motion import MotionMagnifier
-from pyevm.magnification.phase import PhaseMagnifier
+# Configure log level before any pyevm imports so module-level loggers pick it up.
+_log_level = os.environ.get("PYEVM_LOG_LEVEL", "INFO")
+logger.remove()
+logger.add(sys.stderr, level=_log_level)
+
+import streamlit as st  # noqa: E402
+import torch  # noqa: E402
+
+from pyevm.device import get_device  # noqa: E402
+from pyevm.io.video import VideoReader, VideoWriter  # noqa: E402
+from pyevm.magnification.color import ColorMagnifier  # noqa: E402
+from pyevm.magnification.motion import MotionMagnifier  # noqa: E402
+from pyevm.magnification.phase import PhaseMagnifier  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Page config
@@ -65,7 +72,7 @@ def _write_video_to_bytes(frames: torch.Tensor, fps: float) -> bytes:
 
 
 # ---------------------------------------------------------------------------
-# UI
+# UI helpers
 # ---------------------------------------------------------------------------
 
 def _sidebar_device(device: torch.device) -> None:
@@ -163,16 +170,18 @@ def main() -> None:
         st.info("Upload a video to get started.")
         return
 
-    # Write upload to temp file
+    # Store bytes before reading (file_uploader cursor moves on .read())
+    video_bytes_in = uploaded.read()
     suffix = Path(uploaded.name).suffix
-    tmp_in = _bytes_to_temp_file(uploaded.read(), suffix)
+    tmp_in = _bytes_to_temp_file(video_bytes_in, suffix)
 
-    # --- Video info ---
-    st.markdown("## 2. Video Info")
+    # --- Video info + preview ---
+    st.markdown("## 2. Original Video")
     try:
         frames, fps, meta = _read_video(tmp_in, device, max_frames_val)
     except Exception as exc:
         st.error(f"Could not read video: {exc}")
+        tmp_in.unlink(missing_ok=True)
         return
 
     col1, col2, col3, col4 = st.columns(4)
@@ -181,13 +190,11 @@ def main() -> None:
     col3.metric("Width", meta["width"])
     col4.metric("Height", meta["height"])
 
-    # Show first frame as preview
-    first_frame = frames[0].permute(1, 2, 0).cpu().numpy()
-    st.image(first_frame, caption="First frame (original)", use_container_width=True)
+    st.video(video_bytes_in)
 
     # --- Process ---
     st.markdown("## 3. Process")
-    if st.button("Run Magnification", type="primary", use_container_width=True):
+    if st.button("Run Magnification", type="primary", width="stretch"):
         with st.spinner("Processing… this may take a moment for long videos."):
             try:
                 logger.info(f"Starting {algorithm} with params: {params}")
@@ -205,6 +212,7 @@ def main() -> None:
             except Exception as exc:
                 st.error(f"Processing failed: {exc}")
                 logger.exception("Processing error")
+                tmp_in.unlink(missing_ok=True)
                 return
 
         st.success("Done!")
@@ -212,28 +220,26 @@ def main() -> None:
         # --- Results ---
         st.markdown("## 4. Results")
 
-        # Side-by-side first frame comparison
+        with st.spinner("Encoding output video…"):
+            video_bytes_out = _write_video_to_bytes(result, fps)
+
         c1, c2 = st.columns(2)
         with c1:
-            st.image(first_frame, caption="Original — first frame", use_container_width=True)
+            st.markdown("**Original**")
+            st.video(video_bytes_in)
         with c2:
-            result_frame = result[0].permute(1, 2, 0).cpu().float().numpy()
-            st.image(result_frame, caption="Magnified — first frame", use_container_width=True)
-
-        # Download button
-        with st.spinner("Encoding output video…"):
-            video_bytes = _write_video_to_bytes(result, fps)
+            st.markdown("**Magnified**")
+            st.video(video_bytes_out)
 
         out_name = f"{Path(uploaded.name).stem}_magnified.mp4"
         st.download_button(
             label="⬇ Download magnified video",
-            data=video_bytes,
+            data=video_bytes_out,
             file_name=out_name,
             mime="video/mp4",
-            use_container_width=True,
+            width="stretch",
         )
 
-    # Cleanup
     tmp_in.unlink(missing_ok=True)
 
 

@@ -299,8 +299,18 @@ def info(
 
 
 @app.command()
-def dashboard() -> None:
+def dashboard(
+    debug: _DebugOption = False,
+    max_upload_size: Annotated[
+        int,
+        typer.Option("--max-upload-size", help="Maximum upload size in MB.", min=1),
+    ] = 5000,
+) -> None:
     """Launch the Streamlit dashboard in a browser."""
+    import os  # noqa: PLC0415
+
+    os.environ["PYEVM_LOG_LEVEL"] = "DEBUG" if debug else "INFO"
+
     try:
         import streamlit.web.cli as stcli  # noqa: PLC0415
     except ImportError:
@@ -314,7 +324,11 @@ def dashboard() -> None:
     import importlib.resources  # noqa: PLC0415
 
     app_path = importlib.resources.files("pyevm.app").joinpath("streamlit_app.py")
-    sys.argv = ["streamlit", "run", str(app_path), "--server.headless", "false"]
+    sys.argv = [
+        "streamlit", "run", str(app_path),
+        "--server.headless", "false",
+        f"--server.maxUploadSize={max_upload_size}",
+    ]
     sys.exit(stcli.main())
 
 

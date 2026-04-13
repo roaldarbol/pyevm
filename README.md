@@ -178,6 +178,11 @@ Artifact-free motion magnification via steerable pyramid phase decomposition.
 
 Opens the interactive Streamlit dashboard in a browser. Requires `streamlit` to be installed (`pip install streamlit`).
 
+| Option | Default | Description |
+|--------|---------|-------------|
+| `--max-upload-size` | `5000` | Maximum video upload size in MB |
+| `--debug` | off | Enable verbose DEBUG logging |
+
 ### `pyevm info`
 
 Prints detected compute device, PyTorch version, and GPU details.
