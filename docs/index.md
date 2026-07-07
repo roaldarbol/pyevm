@@ -2,6 +2,14 @@
   <img src="assets/logo.png" alt="pyevm logo" width="600"/>
 </p>
 
+<p align="center">
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/pypi/v/pyeulervid.svg" alt="PyPI version"/></a>
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
+  <a href="https://github.com/roaldarbol/pyevm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roaldarbol/pyevm" alt="License"/></a>
+  <a href="https://github.com/roaldarbol/pyevm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roaldarbol/pyevm/ci.yml?branch=main&label=CI" alt="CI status"/></a>
+  <a href="https://codecov.io/gh/roaldarbol/pyevm"><img src="https://codecov.io/gh/roaldarbol/pyevm/graph/badge.svg" alt="Coverage"/></a>
+</p>
+
 #
 
 Eulerian Video Magnification — reveal invisible motion and colour changes in video.
