@@ -97,7 +97,10 @@ lint-fix     = "ruff check --fix src tests"
 lefthook     = "lefthook"
 
 # Security
-audit        = "pip-audit"
+# torch's two advisories have no fixed release and its version is pinned by
+# conda-forge (coupled to torchcodec, see above); ignore them here rather than
+# leave the audit permanently red. Revisit when a patched torch build lands.
+audit        = "pip-audit --ignore-vuln PYSEC-2026-139 --ignore-vuln CVE-2025-3000"
 
 # Docs
 docs         = "zensical build"
