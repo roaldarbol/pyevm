@@ -16,3 +16,7 @@ updates:
       # to torchcodec; bumps must be coordinated there, not via the pip floor.
       - dependency-name: "torch"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]
+      # torchcodec is pinned to 0.10.* in pixi.toml, coupled to pytorch until
+      # conda-forge catches up; bump both together there, not via the pip floor.
+      - dependency-name: "torchcodec"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
