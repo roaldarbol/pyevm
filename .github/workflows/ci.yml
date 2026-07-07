@@ -4,6 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Allow manual runs, and let the Relock workflow re-validate main after it
+  # commits an updated lock (bot commits don't trigger `push` runs on their own).
+  workflow_dispatch:
 
 env:
   # GitHub runners have no GPU. Fake the CUDA virtual package so pixi can solve
