@@ -18,12 +18,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# torchcodec: GPU-accelerated video decoding via FFmpeg.
-# pip wheels are Linux-only. On Windows use pixi (see pixi.toml), which
-# installs torchcodec from conda-forge where Windows CUDA builds exist.
-fast-io = [
-    "torchcodec>=0.10.0; sys_platform != 'win32'",
-]
+# NOTE: GPU-accelerated video decoding via torchcodec is provided by the pixi
+# environment (conda-forge), not pip — see pixi.toml. torchcodec has no Windows
+# pip wheels and its version is coupled to PyTorch, so it is managed there.
+# Non-pixi users can optionally `pip install torchcodec` on Linux/macOS; the
+# package falls back to the OpenCV decoder when it is absent.
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",

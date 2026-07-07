@@ -44,12 +44,6 @@ Eulerian Video Magnification (EVM) is a computational technique that amplifies s
 pip install pyeulervid
 ```
 
-### uv
-
-```bash
-uv add pyeulervid
-```
-
 ### conda / pixi (conda-forge)
 
 ```bash
@@ -57,19 +51,25 @@ conda install -c conda-forge pyevm
 pixi add pyevm
 ```
 
-### Optional: GPU-accelerated video I/O
+### GPU-accelerated video I/O
 
-`torchcodec` enables faster video decoding via FFmpeg. pip wheels are **Linux-only**; on Windows install via pixi (conda-forge provides Windows CUDA builds):
+Faster video decoding uses `torchcodec`, which ships with the **conda-forge**
+package on Windows, Linux, and macOS — so `conda`/`pixi` installs get it
+automatically:
 
 ```bash
-# pip / uv (Linux only)
-pip install "pyeulervid[fast-io]"
-uv add "pyeulervid[fast-io]"
-
-# conda-forge — works on Windows + Linux + macOS
-conda install -c conda-forge pyevm  # torchcodec is included automatically
+conda install -c conda-forge pyevm   # torchcodec included
 pixi add pyevm
 ```
+
+torchcodec has no Windows pip wheels, so it is not a pip dependency. pip users on
+Linux/macOS can add it manually:
+
+```bash
+pip install pyeulervid torchcodec
+```
+
+Without torchcodec, pyevm automatically falls back to the OpenCV decoder.
 
 ## Quick start
 
