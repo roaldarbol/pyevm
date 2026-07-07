@@ -12,6 +12,7 @@ updates:
       interval: "monthly"
     labels: ["dependencies", "python"]
     ignore:
-      # torch major version bumps are manual — they must be coordinated with torchcodec
+      # torch's real version is pinned by conda-forge in pixi.toml and is coupled
+      # to torchcodec; bumps must be coordinated there, not via the pip floor.
       - dependency-name: "torch"
         update-types: ["version-update:semver-major", "version-update:semver-minor"]

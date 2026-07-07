@@ -13,14 +13,18 @@
 name      = "pyeulervid"
 version   = "0.1.0"
 channels  = ["conda-forge"]
-platforms = ["win-64", "linux-64", "osx-64"]
+# CUDA 12.8 is declared only on the GPU platforms (win/linux); macOS is CPU-only.
+# Driver 591.86 supports up to CUDA 13.1; toolkit 12.8 is what torch uses.
+platforms = [
+    { platform = "win-64", cuda = "12.8" },
+    { platform = "linux-64", cuda = "12.8" },
+    "osx-64",
+    "osx-arm64",
+]
 
 # ---------------------------------------------------------------------------
 # Conda dependencies
 # ---------------------------------------------------------------------------
-
-[system-requirements]
-cuda = "12.8"  # driver 591.86 supports up to CUDA 13.1; toolkit 12.8 is what torch uses
 
 [dependencies]
 python = ">=3.12,<3.14"
@@ -29,7 +33,13 @@ python = ">=3.12,<3.14"
 # When conda-forge catches up to 2.11, bump pytorch and torchcodec together.
 pytorch = "2.10.*"
 
-# torchcodec — CUDA build on win-64/linux-64, CPU build on osx-64.
+# opencv from conda-forge (prebuilt binary) rather than the PyPI opencv-python
+# wheel — like torch above, this satisfies the pip requirement so uv skips it.
+# opencv-python has no Intel-macOS wheel for recent versions, so the PyPI route
+# would compile OpenCV from source on osx-64.
+opencv = ">=4.13.0.92"
+
+# torchcodec — CUDA build on win-64/linux-64, CPU build on macOS.
 # Version must match the pytorch version above (0.10 ↔ pytorch 2.10).
 [target.win-64.dependencies]
 torchcodec = { version = "0.10.*", build = "*cuda*" }
@@ -38,7 +48,24 @@ torchcodec = { version = "0.10.*", build = "*cuda*" }
 torchcodec = { version = "0.10.*", build = "*cuda*" }
 
 [target.osx-64.dependencies]
-torchcodec = { version = "0.10.*" }  # CPU-only build
+torchcodec = { version = "0.10.*" }  # CPU-only build (Intel)
+
+[target.osx-arm64.dependencies]
+torchcodec = { version = "0.10.*" }  # CPU-only build (Apple Silicon)
+
+# ---------------------------------------------------------------------------
+# Environments — test matrix across supported Python versions.
+# `default` uses 3.13; `py312` pins 3.12 so CI can exercise both.
+# ---------------------------------------------------------------------------
+[feature.py312.dependencies]
+python = "3.12.*"
+
+[feature.py313.dependencies]
+python = "3.13.*"
+
+[environments]
+default = ["py313"]
+py312 = ["py312"]
 
 # ---------------------------------------------------------------------------
 # PyPI dependencies
@@ -63,6 +90,7 @@ test-cov     = "python -m pytest --cov=pyevm --cov-report=term-missing --cov-rep
 # Linting / formatting
 lint         = "ruff check src tests"
 format       = "ruff format src tests"
+format-check = "ruff format --check src tests"
 lint-fix     = "ruff check --fix src tests"
 
 # Git hooks
