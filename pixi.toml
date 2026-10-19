@@ -13,6 +13,8 @@
 name      = "pyeulervid"
 version   = "0.1.0"
 channels  = ["conda-forge"]
+# Keep in step with pixi-version in .github/workflows (CI pins the same pixi).
+requires-pixi = ">=0.82.0"
 # CUDA 12.8 is declared only on the GPU platforms (win/linux); macOS is CPU-only.
 # Driver 591.86 supports up to CUDA 13.1; toolkit 12.8 is what torch uses.
 platforms = [
