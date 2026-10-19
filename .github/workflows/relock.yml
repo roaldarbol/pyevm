@@ -52,9 +52,12 @@ jobs:
           echo "changed=true" >> "$GITHUB_OUTPUT"
 
       # A commit pushed with GITHUB_TOKEN does not trigger CI, so kick it off
-      # explicitly to validate the refreshed lock (tests, lint, audit).
+      # explicitly to validate the refreshed lock (tests and lint in CI, plus
+      # the security audit).
       - name: Trigger CI on the new lock
         if: steps.commit.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh workflow run ci.yml --ref "${{ github.ref_name }}"
+        run: |
+          gh workflow run ci.yml --ref "${{ github.ref_name }}"
+          gh workflow run audit.yml --ref "${{ github.ref_name }}"
