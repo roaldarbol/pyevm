@@ -73,7 +73,8 @@ git push origin v1.2.3
 ```
 
 The `release` GitHub Actions workflow builds the wheel and sdist and publishes
-to PyPI via OIDC Trusted Publisher (no API token stored).
+to PyPI via OIDC Trusted Publisher (no API token stored). To check the build
+locally, run `pixi run -e build build` (output in `dist/`).
 
 ## Code style
 

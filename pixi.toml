@@ -63,9 +63,18 @@ python = "3.12.*"
 [feature.py313.dependencies]
 python = "3.13.*"
 
+# Release builds only need Python and the build frontend, not torch/CUDA.
+[feature.build.dependencies]
+python = "3.13.*"
+python-build = ">=1.0"
+
+[feature.build.tasks]
+build = "python -m build"
+
 [environments]
 default = ["py313"]
 py312 = ["py312"]
+build = { features = ["build"], no-default-feature = true }
 
 # ---------------------------------------------------------------------------
 # PyPI dependencies

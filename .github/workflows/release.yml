@@ -14,16 +14,17 @@ jobs:
         with:
           fetch-depth: 0  # full history for hatch-vcs
 
-      - name: Set up Python
-        uses: actions/setup-python@v7
+      # The build environment holds only Python and the build frontend, so
+      # this doesn't pull in torch/CUDA.
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.11.2
         with:
-          python-version: "3.12"
-
-      - name: Install build tools
-        run: pip install build
+          pixi-version: v0.72.0
+          environments: build
+          locked: true
 
       - name: Build wheel and sdist
-        run: python -m build
+        run: pixi run -e build build
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@v7
