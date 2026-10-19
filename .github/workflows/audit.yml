@@ -1,0 +1,35 @@
+name: Audit
+
+# Security audit of the locked dependencies. Advisories land against pixi.lock
+# independently of any code change, so running this on every PR made unrelated
+# PRs fail. Instead it runs weekly against main (a failed scheduled run emails
+# the maintainer), on demand, and after the Relock workflow refreshes the lock.
+on:
+  schedule:
+    - cron: "0 6 * * 1"  # 06:00 UTC every Monday
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  # GitHub runners have no GPU. Fake the CUDA virtual package so pixi can solve
+  # and install the conda-forge CUDA builds of pytorch/torchcodec.
+  CONDA_OVERRIDE_CUDA: "12.8"
+
+jobs:
+  audit:
+    name: Security audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up pixi
+        uses: prefix-dev/setup-pixi@v0.11.2
+        with:
+          pixi-version: v0.72.0
+          environments: default
+          cache: true
+
+      - name: Audit dependencies
+        run: pixi run audit

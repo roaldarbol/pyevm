@@ -66,19 +66,3 @@ jobs:
 
       - name: Lint
         run: pixi run lint
-
-  audit:
-    name: Security audit
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Set up pixi
-        uses: prefix-dev/setup-pixi@v0.11.2
-        with:
-          pixi-version: v0.72.0
-          environments: default
-          cache: true
-
-      - name: Audit dependencies
-        run: pixi run audit

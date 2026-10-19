@@ -44,6 +44,9 @@ The pre-commit hook runs both automatically on `git commit`.
 pixi run audit     # pip-audit
 ```
 
+CI runs the audit weekly against `main` (the Audit workflow) rather than on
+every PR, so run it locally when you change dependencies.
+
 ## Building docs locally
 
 ```bash
