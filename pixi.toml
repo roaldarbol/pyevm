@@ -29,7 +29,7 @@ platforms = [
 # ---------------------------------------------------------------------------
 
 [dependencies]
-python = ">=3.10,<3.14"
+python = ">=3.11,<3.14"
 
 # conda-forge lags pip by weeks; pin to the latest available version (2.10).
 # When conda-forge catches up to 2.11, bump pytorch and torchcodec together.
@@ -57,12 +57,9 @@ torchcodec = { version = "0.10.*" }  # CPU-only build (Apple Silicon)
 
 # ---------------------------------------------------------------------------
 # Environments — test matrix across supported Python versions.
-# `default` uses 3.13; `py310`, `py311` and `py312` pin older versions so CI
-# can exercise them all.
+# `default` uses 3.13; `py311` and `py312` pin older versions so CI can exercise
+# them all.
 # ---------------------------------------------------------------------------
-[feature.py310.dependencies]
-python = "3.10.*"
-
 [feature.py311.dependencies]
 python = "3.11.*"
 
@@ -82,7 +79,6 @@ build = "python -m build"
 
 [environments]
 default = ["py313"]
-py310 = ["py310"]
 py311 = ["py311"]
 py312 = ["py312"]
 build = { features = ["build"], no-default-feature = true }

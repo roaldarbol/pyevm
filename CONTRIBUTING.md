@@ -78,6 +78,6 @@ locally, run `pixi run -e build build` (output in `dist/`).
 
 ## Code style
 
-- Python 3.10+, formatted with **ruff** (line length 100).
+- Python 3.11+, formatted with **ruff** (line length 100).
 - Type annotations on all public functions.
 - Google-style docstrings (used by mkdocstrings for API docs).
