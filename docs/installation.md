@@ -12,10 +12,6 @@ The Streamlit dashboard is an optional extra:
 pip install "pyeulervid[app]"
 ```
 
-Python 3.11 or later is recommended. On Python 3.10, some dependencies stay on
-versions with known vulnerabilities because their fixes require 3.11: `filelock`
-(used by PyTorch) and, with the `app` extra, Pillow.
-
 ## conda / pixi (conda-forge)
 
 A conda-forge package is planned but not available yet. It will use the same name
@@ -49,5 +45,5 @@ Override with `--device cuda`, `--device mps`, or `--device cpu`.
 
 ## Requirements
 
-- Python 3.10 or later
+- Python 3.11 or later
 - PyTorch 2.2 or later

@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/pypi/v/pyeulervid.svg" alt="PyPI version"/></a>
-  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
   <a href="https://github.com/roaldarbol/pyevm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roaldarbol/pyevm" alt="License"/></a>
   <a href="https://github.com/roaldarbol/pyevm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roaldarbol/pyevm/ci.yml?branch=main&label=CI" alt="CI status"/></a>
   <a href="https://codecov.io/gh/roaldarbol/pyevm"><img src="https://codecov.io/gh/roaldarbol/pyevm/graph/badge.svg" alt="Coverage"/></a>
@@ -50,10 +50,6 @@ The Streamlit dashboard is an optional extra:
 ```bash
 pip install "pyeulervid[app]"
 ```
-
-Python 3.11 or later is recommended. On Python 3.10, some dependencies stay on
-versions with known vulnerabilities because their fixes require 3.11: `filelock`
-(used by PyTorch) and, with the `app` extra, Pillow.
 
 ### conda / pixi (conda-forge)
 
