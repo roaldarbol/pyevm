@@ -396,7 +396,7 @@ def dashboard(
         import streamlit.web.cli as stcli  # noqa: PLC0415
     except ImportError:
         typer.echo(
-            "Streamlit is not installed. Install it with:\n  pip install streamlit",
+            'Streamlit is not installed. Install it with:\n  pip install "pyeulervid[app]"',
             err=True,
         )
         raise typer.Exit(code=1) from None

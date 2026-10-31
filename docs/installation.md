@@ -6,33 +6,34 @@
 pip install pyeulervid
 ```
 
-## conda / pixi (conda-forge)
+The Streamlit dashboard is an optional extra:
 
 ```bash
-# conda
-conda install -c conda-forge pyevm
-
-# pixi
-pixi add pyevm
+pip install "pyeulervid[app]"
 ```
+
+Python 3.11 or later is recommended. On Python 3.10, some dependencies stay on
+versions with known vulnerabilities because their fixes require 3.11: `filelock`
+(used by PyTorch) and, with the `app` extra, Pillow.
+
+## conda / pixi (conda-forge)
+
+A conda-forge package is planned but not available yet. It will use the same name
+as on PyPI, `pyeulervid`.
 
 ## GPU-accelerated video I/O
 
-Faster video decoding uses `torchcodec`, which ships with the **conda-forge**
-package on Windows, Linux, and macOS — so `conda`/`pixi` installs include it
-automatically:
-
-```bash
-conda install -c conda-forge pyevm   # torchcodec included
-pixi add pyevm
-```
-
-torchcodec has no Windows pip wheels, so it is not declared as a pip dependency.
-pip users on Linux/macOS can add it manually:
+Faster video decoding uses `torchcodec`. It has no Windows pip wheels, so it is not
+declared as a pip dependency. pip users on Linux/macOS can add it manually:
 
 ```bash
 pip install pyeulervid torchcodec
 ```
+
+The planned conda-forge package will include torchcodec on Windows, Linux, and
+macOS. Until then, the
+[pixi development environment](https://github.com/roaldarbol/pyevm/blob/main/CONTRIBUTING.md#development-setup)
+provides it.
 
 Without torchcodec, pyevm automatically falls back to the OpenCV decoder.
 
@@ -48,5 +49,5 @@ Override with `--device cuda`, `--device mps`, or `--device cpu`.
 
 ## Requirements
 
-- Python 3.12 or later
+- Python 3.10 or later
 - PyTorch 2.2 or later

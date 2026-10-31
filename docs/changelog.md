@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Streamlit is now optional: install the `app` extra (`pip install "pyeulervid[app]"`) to use `pyevm dashboard`.
+- Depend on `opencv-python-headless` instead of `opencv-python`, so pyevm can be installed alongside other headless OpenCV packages.
+- Minimum Python lowered from 3.12 to 3.10. Python 3.11 or later is recommended, because the fixes for known vulnerabilities in `filelock` and Pillow require it.
+
+### Removed
+
+- `pillow` dependency, which pyevm never imported directly.
+
+### Fixed
+
+- Install docs no longer list a conda-forge package that doesn't exist yet. The planned package will be named `pyeulervid`, as on PyPI.
+
 ## [0.1.0] - 2026-04-13
 
 ### Added

@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/pypi/v/pyeulervid.svg" alt="PyPI version"/></a>
-  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
   <a href="https://github.com/roaldarbol/pyevm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roaldarbol/pyevm" alt="License"/></a>
   <a href="https://github.com/roaldarbol/pyevm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roaldarbol/pyevm/ci.yml?branch=main&label=CI" alt="CI status"/></a>
   <a href="https://codecov.io/gh/roaldarbol/pyevm"><img src="https://codecov.io/gh/roaldarbol/pyevm/graph/badge.svg" alt="Coverage"/></a>
@@ -45,30 +45,33 @@ Eulerian Video Magnification (EVM) is a computational technique that amplifies s
 pip install pyeulervid
 ```
 
-### conda / pixi (conda-forge)
+The Streamlit dashboard is an optional extra:
 
 ```bash
-conda install -c conda-forge pyevm
-pixi add pyevm
+pip install "pyeulervid[app]"
 ```
+
+Python 3.11 or later is recommended. On Python 3.10, some dependencies stay on
+versions with known vulnerabilities because their fixes require 3.11: `filelock`
+(used by PyTorch) and, with the `app` extra, Pillow.
+
+### conda / pixi (conda-forge)
+
+A conda-forge package is planned but not available yet. It will use the same name
+as on PyPI, `pyeulervid`.
 
 ### GPU-accelerated video I/O
 
-Faster video decoding uses `torchcodec`, which ships with the **conda-forge**
-package on Windows, Linux, and macOS — so `conda`/`pixi` installs get it
-automatically:
-
-```bash
-conda install -c conda-forge pyevm   # torchcodec included
-pixi add pyevm
-```
-
-torchcodec has no Windows pip wheels, so it is not a pip dependency. pip users on
-Linux/macOS can add it manually:
+Faster video decoding uses `torchcodec`. It has no Windows pip wheels, so it is not
+a pip dependency. pip users on Linux/macOS can add it manually:
 
 ```bash
 pip install pyeulervid torchcodec
 ```
+
+The planned conda-forge package will include torchcodec on Windows, Linux, and
+macOS. Until then, the [pixi development environment](CONTRIBUTING.md#development-setup)
+provides it.
 
 Without torchcodec, pyevm automatically falls back to the OpenCV decoder.
 
@@ -181,7 +184,7 @@ Artifact-free motion magnification via steerable pyramid phase decomposition.
 
 ### `pyevm dashboard`
 
-Opens the interactive Streamlit dashboard in a browser. Requires `streamlit` to be installed (`pip install streamlit`).
+Opens the interactive Streamlit dashboard in a browser. Requires the `app` extra (`pip install "pyeulervid[app]"`).
 
 | Option | Default | Description |
 |--------|---------|-------------|
