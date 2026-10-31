@@ -4,7 +4,7 @@
 
 <p align="center">
   <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/pypi/v/pyeulervid.svg" alt="PyPI version"/></a>
-  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
+  <a href="https://pypi.org/project/pyeulervid"><img src="https://img.shields.io/badge/python-3.10%20%7C%203.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white" alt="Python versions"/></a>
   <a href="https://github.com/roaldarbol/pyevm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roaldarbol/pyevm" alt="License"/></a>
   <a href="https://github.com/roaldarbol/pyevm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roaldarbol/pyevm/ci.yml?branch=main&label=CI" alt="CI status"/></a>
   <a href="https://codecov.io/gh/roaldarbol/pyevm"><img src="https://codecov.io/gh/roaldarbol/pyevm/graph/badge.svg" alt="Coverage"/></a>
@@ -32,14 +32,14 @@ implementations of the three canonical EVM algorithms, plus a CLI and an interac
 ## Installation
 
 ```bash
-# PyPI
 pip install pyeulervid
 
-# conda-forge
-conda install -c conda-forge pyevm
+# with the Streamlit dashboard
+pip install "pyeulervid[app]"
 ```
 
-See [Installation](installation.md) for GPU-accelerated video I/O options.
+See [Installation](installation.md) for conda-forge status and GPU-accelerated video I/O
+options.
 
 ## Quick start
 

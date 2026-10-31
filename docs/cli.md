@@ -77,7 +77,8 @@ pyevm phase INPUT OUTPUT [OPTIONS]
 
 ## pyevm dashboard
 
-Opens the interactive Streamlit dashboard in a browser.
+Opens the interactive Streamlit dashboard in a browser. Requires the `app` extra
+(`pip install "pyeulervid[app]"`).
 
 ```bash
 pyevm dashboard [OPTIONS]
