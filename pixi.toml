@@ -31,9 +31,9 @@ platforms = [
 [dependencies]
 python = ">=3.11,<3.14"
 
-# conda-forge lags pip by weeks; pin to the latest available version (2.10).
-# When conda-forge catches up to 2.11, bump pytorch and torchcodec together.
-pytorch = "2.10.*"
+# conda-forge lags pip by weeks. 2.13 is the newest release it builds for CUDA 12.8
+# on Windows; 2.14 is CUDA 13.4 only there.
+pytorch = "2.13.*"
 
 # opencv from conda-forge (prebuilt binary) rather than the PyPI
 # opencv-python-headless wheel — like torch above, this satisfies the pip requirement so uv skips it.
@@ -42,18 +42,18 @@ pytorch = "2.10.*"
 opencv = ">=4.13.0.92"
 
 # torchcodec — CUDA build on win-64/linux-64, CPU build on macOS.
-# Version must match the pytorch version above (0.10 ↔ pytorch 2.10).
+# 0.17 supports pytorch >=2.11.
 [target.win-64.dependencies]
-torchcodec = { version = "0.10.*", build = "*cuda*" }
+torchcodec = { version = "0.17.*", build = "*cuda*" }
 
 [target.linux-64.dependencies]
-torchcodec = { version = "0.10.*", build = "*cuda*" }
+torchcodec = { version = "0.17.*", build = "*cuda*" }
 
 [target.osx-64.dependencies]
-torchcodec = { version = "0.10.*" }  # CPU-only build (Intel)
+torchcodec = { version = "0.17.*" }  # CPU-only build (Intel)
 
 [target.osx-arm64.dependencies]
-torchcodec = { version = "0.10.*" }  # CPU-only build (Apple Silicon)
+torchcodec = { version = "0.17.*" }  # CPU-only build (Apple Silicon)
 
 # ---------------------------------------------------------------------------
 # Environments — test matrix across supported Python versions.
@@ -113,10 +113,10 @@ lint-fix     = "ruff check --fix src tests"
 lefthook     = "lefthook"
 
 # Security
-# torch's two advisories have no fixed release and its version is pinned by
-# conda-forge (coupled to torchcodec, see above); ignore them here rather than
-# leave the audit permanently red. Revisit when a patched torch build lands.
-audit        = "pip-audit --ignore-vuln PYSEC-2026-139 --ignore-vuln CVE-2025-3000"
+# conda-forge's pytorch 2.13 requires setuptools <82, so these two setuptools
+# advisories can't be fixed in the lock, and pyevm doesn't use setuptools itself.
+# pytorch 2.14 drops the cap, so both ignores can go with it (CUDA 13.4 only on Windows).
+audit        = "pip-audit --ignore-vuln PYSEC-2026-3447 --ignore-vuln GHSA-xmj3-9gf7-h52w"
 
 # Docs
 docs         = "zensical build"

@@ -14,7 +14,7 @@
   <a href="https://github.com/roaldarbol/pyevm/blob/main/LICENSE"><img src="https://img.shields.io/github/license/roaldarbol/pyevm" alt="License"/></a>
   <a href="https://github.com/roaldarbol/pyevm/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/roaldarbol/pyevm/ci.yml?branch=main&label=CI" alt="CI status"/></a>
   <a href="https://codecov.io/gh/roaldarbol/pyevm"><img src="https://codecov.io/gh/roaldarbol/pyevm/graph/badge.svg" alt="Coverage"/></a>
-  <img src="https://img.shields.io/badge/PyTorch-2.10-ee4c2c?logo=pytorch&logoColor=white" alt="PyTorch"/>
+  <img src="https://img.shields.io/badge/PyTorch-2.13-ee4c2c?logo=pytorch&logoColor=white" alt="PyTorch"/>
 </p>
 
 ---
